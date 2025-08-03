@@ -20,5 +20,18 @@
     "paths": {
       "@/*": ["src/*"]
     }
-  }
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "**/*.e2e-spec.ts",
+    "coverage",
+    "jest.config.js",
+    "jest-setup.ts"
+  ]
 }

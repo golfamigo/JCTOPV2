@@ -11,44 +11,19 @@ COPY turbo.json ./
 COPY packages/ ./packages/
 COPY apps/server/ ./apps/server/
 
-# Install dependencies
-RUN npm install --only=production --ignore-scripts
+# Install only production dependencies at root level
+RUN npm ci --only=production --ignore-scripts
 
-# Install dev dependencies needed for build
-RUN npm install typescript @types/node --no-save
-
-# Create production tsconfig for server (excludes test files)
-WORKDIR /app/apps/server
-RUN cat > tsconfig.production.json << 'EOF'
-{
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "declaration": false,
-    "sourceMap": false
-  },
-  "include": [
-    "src/**/*.ts"
-  ],
-  "exclude": [
-    "src/**/*.spec.ts",
-    "src/**/*.test.ts",
-    "src/**/*.e2e-spec.ts",
-    "dist",
-    "node_modules",
-    "coverage"
-  ]
-}
-EOF
+# Install minimal build dependencies
+RUN npm install typescript --no-save --production=false
 
 # Build shared-types first
 WORKDIR /app/packages/shared-types
-RUN npx tsc
+RUN npm run build
 
-# Build the server without test files
+# Build the server using npm script (which uses the updated tsconfig.json)
 WORKDIR /app/apps/server
-RUN npx tsc -p tsconfig.production.json
+RUN npm run build
 
 # Production stage
 FROM node:18-alpine
