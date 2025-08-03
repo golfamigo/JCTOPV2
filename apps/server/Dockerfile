@@ -7,8 +7,9 @@ WORKDIR /app
 COPY package*.json ./
 COPY turbo.json ./
 
-# Copy all packages and apps
-COPY packages/ ./packages/
+# Copy only what we need for server build
+COPY packages/shared-types/ ./packages/shared-types/
+COPY packages/config/ ./packages/config/
 COPY apps/server/ ./apps/server/
 
 # Install only production dependencies at root level
@@ -21,9 +22,9 @@ RUN npm install typescript --no-save --production=false
 WORKDIR /app/packages/shared-types
 RUN npm run build
 
-# Build the server using npm script (which uses the updated tsconfig.json)
+# Build the server directly with nest build
 WORKDIR /app/apps/server
-RUN npm run build
+RUN npx nest build
 
 # Production stage
 FROM node:18-alpine

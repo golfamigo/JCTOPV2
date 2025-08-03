@@ -11,5 +11,18 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.e2e-spec.ts",
+    "coverage",
+    "jest.config.js",
+    "jest-setup.ts",
+    "jest-setup-web.ts"
   ]
 }
