@@ -1,4 +1,4 @@
-# Build stage
+# Production Dockerfile - excludes test files
 FROM node:18-alpine AS builder
 
 WORKDIR /app
@@ -7,20 +7,48 @@ WORKDIR /app
 COPY package*.json ./
 COPY turbo.json ./
 
-# Copy workspace packages first
+# Copy all packages and apps
 COPY packages/ ./packages/
 COPY apps/server/ ./apps/server/
 
-# Install all dependencies including workspace dependencies
-RUN npm install
+# Install dependencies
+RUN npm install --only=production --ignore-scripts
+
+# Install dev dependencies needed for build
+RUN npm install typescript @types/node --no-save
+
+# Create production tsconfig for server (excludes test files)
+WORKDIR /app/apps/server
+RUN cat > tsconfig.production.json << 'EOF'
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "src/**/*.spec.ts",
+    "src/**/*.test.ts",
+    "src/**/*.e2e-spec.ts",
+    "dist",
+    "node_modules",
+    "coverage"
+  ]
+}
+EOF
 
 # Build shared-types first
 WORKDIR /app/packages/shared-types
-RUN npm run build
+RUN npx tsc
 
-# Build the server
+# Build the server without test files
 WORKDIR /app/apps/server
-RUN npm run build
+RUN npx tsc -p tsconfig.production.json
 
 # Production stage
 FROM node:18-alpine
@@ -30,36 +58,27 @@ WORKDIR /app
 # Install production dependencies only
 COPY package*.json ./
 COPY apps/server/package*.json ./apps/server/
-COPY packages/shared-types/package*.json ./packages/shared-types/
-
-# Copy workspace structure for dependencies
 RUN npm ci --only=production
 
-# Copy built application and necessary files
+# Copy built application
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
 COPY --from=builder /app/packages/shared-types ./packages/shared-types
-COPY --from=builder /app/apps/server/node_modules ./apps/server/node_modules
 
-# Copy migration files
+# Copy necessary runtime files
 COPY apps/server/src/migrations ./apps/server/src/migrations
 COPY apps/server/data-source.ts ./apps/server/
-
-# Copy start script
 COPY apps/server/scripts/start-prod.sh ./apps/server/scripts/
 RUN chmod +x ./apps/server/scripts/start-prod.sh
 
 WORKDIR /app/apps/server
 
 # Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
-
-# Change ownership of necessary files
-RUN chown -R nodejs:nodejs /app
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001 && \
+    chown -R nodejs:nodejs /app
 
 USER nodejs
 
 EXPOSE 3000
 
-# Start the application
 CMD ["sh", "scripts/start-prod.sh"]
