@@ -7,16 +7,16 @@ WORKDIR /app
 COPY package*.json ./
 COPY turbo.json ./
 
-# Copy workspace packages
-COPY apps/server/package*.json ./apps/server/
-COPY packages/shared-types/package*.json ./packages/shared-types/
+# Copy workspace packages first
+COPY packages/ ./packages/
+COPY apps/server/ ./apps/server/
 
-# Install all dependencies
-RUN npm ci
+# Install all dependencies including workspace dependencies
+RUN npm install
 
-# Copy source code
-COPY apps/server ./apps/server
-COPY packages/shared-types ./packages/shared-types
+# Build shared-types first
+WORKDIR /app/packages/shared-types
+RUN npm run build
 
 # Build the server
 WORKDIR /app/apps/server
