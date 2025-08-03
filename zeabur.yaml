@@ -1,0 +1,15 @@
+services:
+  backend:
+    buildCommand: "cd apps/server && npm run build"
+    startCommand: "cd apps/server && npm start"
+    dockerfile: "apps/server/Dockerfile"
+    context: "."
+    env:
+      NODE_ENV: "production"
+  
+  frontend:
+    buildCommand: "cd apps/client && npm run build:web"
+    dockerfile: "apps/client/Dockerfile.web"
+    context: "."
+    env:
+      NODE_ENV: "production"
