@@ -78,10 +78,7 @@ export class CreateInvoiceSettingsTable1744000000000 implements MigrationInterfa
 
         await queryRunner.createIndex(
             "invoice_settings",
-            new Index({
-                name: "idx_invoice_settings_event",
-                columnNames: ["event_id"],
-            })
+            new Index("idx_invoice_settings_event", ["event_id"])
         );
     }
 
