@@ -1,15 +1,41 @@
-services:
-  backend:
-    dockerfile: "Dockerfile.fixed"
-    context: "."
-    env:
-      NODE_ENV: "production"
-      PORT: 3000
+apiVersion: zeabur.com/v1
+kind: Template
+metadata:
+  name: JCTOP Event Management Platform
+spec:
+  description: Full-stack event management platform with React Native frontend and NestJS backend
+  icon: https://raw.githubusercontent.com/golfamigo/JCTOPV2/master/docs/jctop-icon.svg
   
-  frontend:
-    buildCommand: "cd apps/client && npm install && npm run build:web"
-    dockerfile: "apps/client/Dockerfile.web"
-    context: "."
-    env:
-      NODE_ENV: "production"
-      EXPO_PUBLIC_API_URL: "https://jctop.zeabur.app/api/v1"
+  services:
+    - name: backend
+      template: GIT
+      spec:
+        source:
+          type: git
+        dockerfile: Dockerfile.fixed
+        ports:
+          - id: api
+            port: 3000
+            type: HTTP
+        env:
+          NODE_ENV:
+            default: production
+          PORT:
+            default: "3000"
+
+    - name: frontend  
+      template: GIT
+      spec:
+        source:
+          type: git
+        dockerfile: apps/client/Dockerfile.web
+        buildCommand: cd apps/client && npm install && npm run build:web
+        ports:
+          - id: web
+            port: 80
+            type: HTTP
+        env:
+          NODE_ENV:
+            default: production
+          EXPO_PUBLIC_API_URL:
+            default: https://jctop.zeabur.app/api/v1
