@@ -1,4 +1,9 @@
-import './crypto-polyfill'; // Must be first import
+// Fix crypto for Node.js 18
+import * as crypto from 'crypto';
+if (typeof global.crypto === 'undefined') {
+  global.crypto = crypto as any;
+}
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -28,6 +33,11 @@ async function bootstrap() {
     process.exit(1);
   }
   
+  // Add root health check for deployment platforms
+  app.use('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
   // Set global API prefix
   app.setGlobalPrefix('api/v1');
   
@@ -39,7 +49,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
   
-  const port = process.env.PORT || 3001;
+  const port = process.env.PORT || 3000;
   await app.listen(port);
   console.log(`🚀 Application is running on: http://localhost:${port}`);
 }

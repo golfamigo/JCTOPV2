@@ -7,8 +7,8 @@ if (typeof global.crypto === 'undefined') {
 }
 
 // Also add webcrypto if needed
-if (typeof global.crypto.webcrypto === 'undefined' && crypto.webcrypto) {
-  (global.crypto as any).webcrypto = crypto.webcrypto;
+if (typeof (global.crypto as any).webcrypto === 'undefined' && (crypto as any).webcrypto) {
+  (global.crypto as any).webcrypto = (crypto as any).webcrypto;
 }
 
 export {};

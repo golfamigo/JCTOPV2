@@ -1,0 +1,45 @@
+# Simple production Dockerfile for JCTOPV2 backend
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Copy everything
+COPY . .
+
+# Install dependencies
+RUN npm ci --only=production --ignore-scripts
+
+# Install TypeScript for building
+RUN npm install typescript @nestjs/cli --no-save
+
+# Build
+WORKDIR /app/packages/shared-types
+RUN npx tsc || true
+
+WORKDIR /app/apps/server
+RUN npx nest build
+
+# Production stage
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install production dependencies
+COPY package*.json ./
+COPY apps/server/package*.json ./apps/server/
+RUN npm ci --only=production
+
+# Copy built application
+COPY --from=builder /app/apps/server/dist ./apps/server/dist
+COPY --from=builder /app/packages ./packages
+
+# Copy migrations
+COPY apps/server/src/migrations ./apps/server/src/migrations
+COPY apps/server/data-source.ts ./apps/server/
+
+WORKDIR /app/apps/server
+
+EXPOSE 3000
+
+# Start directly without migrations
+CMD ["node", "dist/main"]

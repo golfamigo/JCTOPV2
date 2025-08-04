@@ -16,6 +16,6 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
     synchronize: process.env.NODE_ENV !== 'production',
     migrationsRun: process.env.NODE_ENV === 'production',
     logging: process.env.NODE_ENV === 'development',
-    ssl: false, // Zeabur doesn't support SSL
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
   };
 });
