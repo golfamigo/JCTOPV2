@@ -1,4 +1,5 @@
-const API_BASE_URL = 'http://localhost:3000/api/v1';
+// Configure API base URL based on environment
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://jctop.zeabur.app/api/v1';
 import { Event } from '@jctop-event/shared-types';
 import statisticsService, { EventStatistics } from './statisticsService';
 

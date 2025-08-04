@@ -1,5 +1,5 @@
-// Use environment variable or fallback to localhost for development
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+// Use environment variable or fallback to production URL
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://jctop.zeabur.app/api/v1';
 
 export interface EventStatistics {
   eventId: string;

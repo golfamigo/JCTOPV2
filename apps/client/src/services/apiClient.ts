@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../stores/authStore';
 
-// TODO: Make this configurable via environment variables in production
-const API_BASE_URL = 'http://localhost:3000/api/v1';
+// Configure API base URL based on environment
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://jctop.zeabur.app/api/v1';
 const TOKEN_KEY = '@auth_token';
 
 class ApiClient {
