@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { ScrollView, View } from 'react-native';
-import { ChakraProvider, useColorModeValue } from '@chakra-ui/react';
+import { useColorModeValue } from '@chakra-ui/react';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import EventsList from '../../components/features/event/EventsList';
-import theme from '../../theme';
 
 /**
  * Events Discovery Page Component
@@ -39,24 +38,22 @@ export default function EventsPage() {
   };
 
   return (
-    <ChakraProvider theme={theme}>
-      <View style={{ flex: 1 }}>
-        <StatusBar style={statusBarStyle} />
-        <ScrollView 
-          style={{ flex: 1 }}
-          contentContainerStyle={{ flexGrow: 1 }}
-          showsVerticalScrollIndicator={false}
-        >
-          <EventsList
-            onEventClick={handleEventClick}
-            onFavorite={handleFavorite}
-            favoritedEvents={favoritedEvents}
-            title="Discover Events"
-            showTitle={true}
-            itemsPerPage={12}
-          />
-        </ScrollView>
-      </View>
-    </ChakraProvider>
+    <View style={{ flex: 1 }}>
+      <StatusBar style={statusBarStyle} />
+      <ScrollView 
+        style={{ flex: 1 }}
+        contentContainerStyle={{ flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <EventsList
+          onEventClick={handleEventClick}
+          onFavorite={handleFavorite}
+          favoritedEvents={favoritedEvents}
+          title="Discover Events"
+          showTitle={true}
+          itemsPerPage={12}
+        />
+      </ScrollView>
+    </View>
   );
 }

@@ -28,6 +28,7 @@
       "permissions": ["CAMERA"]
     },
     "plugins": [
+      "expo-router",
       [
         "expo-camera",
         {
@@ -35,6 +36,7 @@
         }
       ]
     ],
+    "scheme": "jctop-event",
     "web": {
       "favicon": "./assets/favicon.png"
     }

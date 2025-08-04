@@ -11,7 +11,9 @@ export default function RootLayout() {
           headerShown: false, // Let individual pages handle headers
         }}
       >
+        <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="auth" options={{ headerShown: false, presentation: 'modal' }} />
       </Stack>
     </ChakraProvider>
   );
