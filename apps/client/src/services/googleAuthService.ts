@@ -59,7 +59,7 @@ export class GoogleAuthService {
       this.authPromiseResolve = resolve;
 
       // Redirect to backend Google OAuth endpoint
-      const authUrl = `${process.env.EXPO_PUBLIC_API_BASE_URL}/auth/google`;
+      const authUrl = `${process.env.EXPO_PUBLIC_API_URL || 'https://jctop.zeabur.app/api/v1'}/auth/google`;
       
       Linking.openURL(authUrl).catch((error) => {
         this.authPromiseResolve = null;

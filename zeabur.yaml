@@ -7,8 +7,9 @@ services:
       PORT: 3000
   
   frontend:
-    buildCommand: "cd apps/client && npm run build:web"
+    buildCommand: "cd apps/client && npm install && npm run build:web"
     dockerfile: "apps/client/Dockerfile.web"
     context: "."
     env:
       NODE_ENV: "production"
+      EXPO_PUBLIC_API_URL: "https://jctop.zeabur.app/api/v1"

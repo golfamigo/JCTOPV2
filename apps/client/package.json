@@ -10,7 +10,7 @@
     "web": "expo start --web",
     "dev": "expo start",
     "build": "tsc --noEmit",
-    "build:web": "expo export:web",
+    "build:web": "npx expo export --platform web --output-dir web-build",
     "test": "jest",
     "lint": "eslint .",
     "type-check": "tsc --noEmit"
@@ -29,6 +29,7 @@
     "expo-auth-session": "^6.2.1",
     "expo-camera": "~16.1.0",
     "expo-crypto": "^14.1.5",
+    "expo-dom": "^27.0.2",
     "expo-router": "^5.1.4",
     "expo-status-bar": "~1.12.1",
     "framer-motion": "^12.23.11",
