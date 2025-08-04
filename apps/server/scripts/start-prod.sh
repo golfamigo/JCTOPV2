@@ -2,9 +2,8 @@
 
 echo "Starting production server..."
 
-# Run migrations
-echo "Running database migrations..."
-npm run migration:run
+# Skip migrations for now - will run them manually after deployment
+echo "Skipping database migrations for initial deployment..."
 
 # Start the server
 echo "Starting NestJS server..."
