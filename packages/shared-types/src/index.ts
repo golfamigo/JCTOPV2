@@ -13,8 +13,8 @@ export interface User {
 export interface Event {
   id: string;
   organizerId: string;
-  categoryId: string;
-  venueId: string;
+  categoryId?: string;
+  venueId?: string;
   title: string;
   description: string;
   startDate: Date;
@@ -99,8 +99,8 @@ export interface CreateEventDto {
   startDate: string;
   endDate: string;
   location: string;
-  categoryId: string;
-  venueId: string;
+  categoryId?: string;
+  venueId?: string;
 }
 
 export interface CreateTicketTypeDto {
