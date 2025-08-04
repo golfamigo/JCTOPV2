@@ -3,7 +3,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RegistrationCompletionService } from './services/registration-completion.service';
 import { Registration } from './entities/registration.entity';
 
-@Controller('api/v1/registrations')
+@Controller('registrations')
 export class RegistrationsController {
   constructor(
     private registrationCompletionService: RegistrationCompletionService,

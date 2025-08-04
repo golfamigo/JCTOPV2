@@ -3,7 +3,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { EventResponseDto } from '../events/dto';
 import { OrganizerService } from './organizer.service';
 
-@Controller('api/v1/organizer')
+@Controller('organizer')
 export class OrganizerController {
   constructor(
     private readonly organizerService: OrganizerService,

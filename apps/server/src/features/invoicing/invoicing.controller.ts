@@ -19,7 +19,7 @@ import {
   InvoiceSettingsResponseDto 
 } from '../events/dto/invoice-settings.dto';
 
-@Controller('api/v1/events/:eventId/invoice-settings')
+@Controller('events/:eventId/invoice-settings')
 @UseGuards(JwtAuthGuard)
 export class InvoicingController {
   constructor(private readonly invoicingService: InvoicingService) {}

@@ -19,7 +19,7 @@ import { PaymentRequestDto } from './dto/payment-request.dto';
 import { PaymentResponseDto, PaymentStatusResponseDto } from './dto/payment-response.dto';
 import { CreatePaymentProviderDto, UpdatePaymentProviderDtoRequest } from './dto/payment-provider.dto';
 
-@Controller('api/v1')
+@Controller('')
 export class PaymentsController {
   constructor(
     private paymentGatewayService: PaymentGatewayService,
