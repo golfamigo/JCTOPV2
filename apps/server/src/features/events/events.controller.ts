@@ -14,7 +14,7 @@ import { EventStatisticsResponseDto } from './dto/event-statistics.dto';
 import { EventReportService } from './services/event-report.service';
 import { ReportExportService } from './services/report-export.service';
 
-@Controller('api/v1/events')
+@Controller('events')
 export class EventsController {
   constructor(
     private readonly eventsService: EventsService,
