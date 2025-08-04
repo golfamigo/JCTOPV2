@@ -22,8 +22,10 @@ export class CreateEventDto implements ICreateEventDto {
   location: string;
 
   @IsUUID()
-  categoryId: string;
+  @IsOptional()
+  categoryId?: string;
 
   @IsUUID()
-  venueId: string;
+  @IsOptional()
+  venueId?: string;
 }

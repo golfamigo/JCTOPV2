@@ -15,10 +15,10 @@ export class Event implements EventInterface {
   @Column({ type: 'uuid', name: 'organizer_id' })
   organizerId: string;
 
-  @Column({ type: 'uuid', name: 'category_id' })
+  @Column({ type: 'uuid', name: 'category_id', nullable: true })
   categoryId: string;
 
-  @Column({ type: 'uuid', name: 'venue_id' })
+  @Column({ type: 'uuid', name: 'venue_id', nullable: true })
   venueId: string;
 
   @Column({ type: 'varchar', length: 255 })
