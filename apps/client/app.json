@@ -28,7 +28,12 @@
       "permissions": ["CAMERA"]
     },
     "plugins": [
-      "expo-router",
+      [
+        "expo-router",
+        {
+          "root": "./src/app"
+        }
+      ],
       [
         "expo-camera",
         {
