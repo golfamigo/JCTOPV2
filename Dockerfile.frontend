@@ -20,6 +20,12 @@ COPY packages/shared-types ./packages/shared-types
 
 # Build web version
 WORKDIR /app/apps/client
+
+# Set environment variables for build
+ENV EXPO_ROUTER_APP_ROOT=src/app
+ENV NODE_ENV=production
+ENV EXPO_PUBLIC_API_URL=https://jctop.zeabur.app/api/v1
+
 RUN npm run build:web
 
 # Nginx stage
