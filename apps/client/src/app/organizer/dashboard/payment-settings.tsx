@@ -146,6 +146,10 @@ const PaymentSettingsPage: React.FC = () => {
     }
   };
 
+  const isProviderConfigured = (provider: PaymentProvider): boolean => {
+    return Boolean(provider.credentials && typeof provider.credentials === 'object' && Object.keys(provider.credentials).length > 0);
+  };
+
   const getProviderStatusColor = (isActive: boolean, isConfigured: boolean) => {
     if (!isConfigured) return colors.warning;
     return isActive ? colors.success : colors.grey3;
@@ -156,21 +160,21 @@ const PaymentSettingsPage: React.FC = () => {
       <View style={styles.providerHeader}>
         <View style={styles.providerInfo}>
           <Icon
-            name={getProviderIcon(provider.type)}
+            name={getProviderIcon(provider.providerId)}
             type="material"
             size={32}
             color={colors.primary}
           />
           <View style={styles.providerDetails}>
-            <Text h4>{provider.name}</Text>
-            <Text style={styles.providerType}>{provider.type.toUpperCase()}</Text>
+            <Text h4>{provider.providerName}</Text>
+            <Text style={styles.providerType}>{provider.providerId.toUpperCase()}</Text>
           </View>
         </View>
         <Badge
-          value={provider.isActive ? 'Active' : provider.isConfigured ? 'Inactive' : 'Not Configured'}
+          value={provider.isActive ? 'Active' : isProviderConfigured(provider) ? 'Inactive' : 'Not Configured'}
           badgeStyle={[
             styles.statusBadge,
-            { backgroundColor: getProviderStatusColor(provider.isActive, provider.isConfigured) }
+            { backgroundColor: getProviderStatusColor(provider.isActive, isProviderConfigured(provider)) }
           ]}
         />
       </View>
@@ -178,29 +182,29 @@ const PaymentSettingsPage: React.FC = () => {
       <Divider style={styles.divider} />
 
       <View style={styles.providerContent}>
-        {provider.description && (
-          <Text style={styles.description}>{provider.description}</Text>
+        {provider.configuration?.description && (
+          <Text style={styles.description}>{provider.configuration.description}</Text>
         )}
         
         <View style={styles.configInfo}>
           <Text style={styles.configLabel}>Configuration Status:</Text>
-          <Text style={[styles.configValue, { color: provider.isConfigured ? colors.success : colors.warning }]}>
-            {provider.isConfigured ? '✓ Configured' : '⚠ Not Configured'}
+          <Text style={[styles.configValue, { color: isProviderConfigured(provider) ? colors.success : colors.warning }]}>
+            {isProviderConfigured(provider) ? '✓ Configured' : '⚠ Not Configured'}
           </Text>
         </View>
 
-        {provider.isConfigured && provider.merchantId && (
+        {isProviderConfigured(provider) && provider.configuration?.merchantId && (
           <View style={styles.configInfo}>
             <Text style={styles.configLabel}>Merchant ID:</Text>
-            <Text style={styles.configValue}>{provider.merchantId}</Text>
+            <Text style={styles.configValue}>{provider.configuration.merchantId}</Text>
           </View>
         )}
 
-        {provider.supportedCurrencies && provider.supportedCurrencies.length > 0 && (
+        {provider.configuration?.supportedCurrencies && provider.configuration.supportedCurrencies.length > 0 && (
           <View style={styles.configInfo}>
             <Text style={styles.configLabel}>Supported Currencies:</Text>
             <View style={styles.currencyList}>
-              {provider.supportedCurrencies.map((currency) => (
+              {provider.configuration.supportedCurrencies.map((currency: string) => (
                 <Badge
                   key={currency}
                   value={currency}
@@ -225,7 +229,7 @@ const PaymentSettingsPage: React.FC = () => {
           ]}
           titleStyle={provider.isActive && { color: colors.error }}
           onPress={() => handleToggleProvider(provider.id, provider.isActive)}
-          disabled={!provider.isConfigured}
+          disabled={!isProviderConfigured(provider)}
         />
         <Button
           title="Configure"

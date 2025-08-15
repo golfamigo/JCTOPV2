@@ -137,8 +137,6 @@ const PaymentProviderCredentialsForm: React.FC<PaymentProviderCredentialsFormPro
       setIsSaving(true);
 
       const providerData: PaymentProviderDto = {
-        type: providerId as 'ecpay' | 'stripe',
-        name: providerId === 'ecpay' ? 'ECPay' : 'Stripe',
         providerId,
         providerName: providerId === 'ecpay' ? 'ECPay 綠界科技' : 'Stripe',
         credentials,
