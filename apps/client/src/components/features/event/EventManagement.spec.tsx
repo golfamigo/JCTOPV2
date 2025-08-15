@@ -1,6 +1,5 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ChakraProvider } from '@chakra-ui/react';
 import EventManagement from './EventManagement';
 import eventService from '../../../services/eventService';
 import { Event } from '@jctop-event/shared-types';

@@ -1,16 +1,12 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ChakraProvider } from '@chakra-ui/react';
 import EventCreateForm from './EventCreateForm';
-import theme from '../../../theme';
+import theme from '@/theme';
 import { CreateEventDto } from '@jctop-event/shared-types';
 
 // Mock toast
 const mockToast = jest.fn();
-jest.mock('@chakra-ui/react', () => ({
-  ...jest.requireActual('@chakra-ui/react'),
-  useToast: () => mockToast,
-}));
+// Removed ChakraUI mock
 
 const renderWithChakra = (component: React.ReactElement) => {
   return render(

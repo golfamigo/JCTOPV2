@@ -1,21 +1,8 @@
 import React from 'react';
-import {
-  Box,
-  VStack,
-  HStack,
-  Text,
-  Badge,
-  Button,
-  Spinner,
-  Center,
-  Alert,
-  AlertIcon,
-  useColorModeValue,
-  Divider,
-  IconButton,
-  Tooltip,
-} from '@chakra-ui/react';
-import { CheckIcon, InfoIcon } from '@chakra-ui/icons';
+import { View, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { Text, Button, Badge, Icon } from '@rneui/themed';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useAppTheme } from '../../../theme';
 
 export interface AttendeeSearchResult {
   id: string;
@@ -44,176 +31,312 @@ export const AttendeeSearchResults: React.FC<AttendeeSearchResultsProps> = ({
   isCheckingIn,
   checkingInId,
 }) => {
-  const bgColor = useColorModeValue('white', 'neutral.800');
-  const borderColor = useColorModeValue('neutral.200', 'neutral.600');
-  const hoverBgColor = useColorModeValue('neutral.50', 'neutral.700');
+  const { colors } = useAppTheme();
 
   const getStatusBadge = (status: AttendeeSearchResult['status']) => {
     switch (status) {
       case 'checkedIn':
-        return { colorScheme: 'green', label: 'Checked In' };
+        return { color: colors.success, label: 'Checked In' };
       case 'paid':
-        return { colorScheme: 'blue', label: 'Paid' };
+        return { color: colors.primary, label: 'Paid' };
       case 'pending':
-        return { colorScheme: 'yellow', label: 'Pending' };
+        return { color: colors.warning, label: 'Pending' };
       case 'cancelled':
-        return { colorScheme: 'red', label: 'Cancelled' };
+        return { color: colors.error, label: 'Cancelled' };
       default:
-        return { colorScheme: 'gray', label: 'Unknown' };
+        return { color: colors.grey3, label: 'Unknown' };
     }
   };
 
   if (isLoading) {
     return (
-      <Center py={12}>
-        <VStack spacing={4}>
-          <Spinner size="xl" color="primary.500" thickness="4px" />
-          <Text color="neutral.600">Searching for attendees...</Text>
-        </VStack>
-      </Center>
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.grey2 }]}>
+          Searching for attendees...
+        </Text>
+      </View>
     );
   }
 
   if (error) {
     return (
-      <Alert status="error" borderRadius="md">
-        <AlertIcon />
-        <Text>{error}</Text>
-      </Alert>
+      <View style={[styles.errorContainer, { 
+        backgroundColor: colors.error + '10',
+        borderColor: colors.error 
+      }]}>
+        <Icon
+          name="error"
+          type="material"
+          color={colors.error}
+          size={20}
+          containerStyle={styles.errorIcon}
+        />
+        <Text style={[styles.errorText, { color: colors.error }]}>
+          {error}
+        </Text>
+      </View>
     );
   }
 
   if (results.length === 0) {
     return (
-      <Box
-        p={8}
-        textAlign="center"
-        border="1px dashed"
-        borderColor={borderColor}
-        borderRadius="md"
-        bg={bgColor}
-      >
-        <Text color="neutral.500" fontSize="lg">
+      <View style={[styles.emptyContainer, { 
+        backgroundColor: colors.card,
+        borderColor: colors.grey4
+      }]}>
+        <Text style={[styles.emptyTitle, { color: colors.grey2 }]}>
           No attendees found
         </Text>
-        <Text color="neutral.400" fontSize="sm" mt={2}>
+        <Text style={[styles.emptySubtitle, { color: colors.grey3 }]}>
           Try searching with a different name or registration number
         </Text>
-      </Box>
+      </View>
     );
   }
 
   return (
-    <VStack spacing={3} align="stretch">
-      <Text color="neutral.600" fontSize="sm" fontWeight="medium">
+    <View style={styles.container}>
+      <Text style={[styles.resultCount, { color: colors.grey2 }]}>
         Found {results.length} attendee{results.length !== 1 ? 's' : ''}
       </Text>
       
-      {results.map((attendee) => {
-        const statusBadge = getStatusBadge(attendee.status);
-        const isCheckedIn = attendee.status === 'checkedIn';
-        const canCheckIn = attendee.status === 'paid';
-        
-        return (
-          <Box
-            key={attendee.id}
-            p={4}
-            border="1px solid"
-            borderColor={borderColor}
-            borderRadius="md"
-            bg={bgColor}
-            _hover={{
-              bg: hoverBgColor,
-              borderColor: 'primary.200',
-              transition: 'all 0.2s',
-            }}
-          >
-            <HStack justify="space-between" align="start" spacing={4}>
-              <VStack align="start" spacing={2} flex={1}>
-                <HStack spacing={3}>
-                  <Text fontWeight="semibold" fontSize="md">
-                    {attendee.name}
-                  </Text>
-                  <Badge
-                    colorScheme={statusBadge.colorScheme}
-                    variant="subtle"
-                    px={2}
-                  >
-                    {statusBadge.label}
-                  </Badge>
-                </HStack>
-                
-                <VStack align="start" spacing={1}>
-                  <Text fontSize="sm" color="neutral.600">
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {results.map((attendee) => {
+          const statusBadge = getStatusBadge(attendee.status);
+          const isCheckedIn = attendee.status === 'checkedIn';
+          const canCheckIn = attendee.status === 'paid';
+          
+          return (
+            <View
+              key={attendee.id}
+              style={[styles.resultCard, { 
+                backgroundColor: colors.card,
+                borderColor: colors.grey4
+              }]}
+            >
+              <View style={styles.cardContent}>
+                <View style={styles.attendeeInfo}>
+                  <View style={styles.nameRow}>
+                    <Text style={[styles.attendeeName, { color: colors.text }]}>
+                      {attendee.name}
+                    </Text>
+                    <Badge
+                      value={statusBadge.label}
+                      badgeStyle={[styles.statusBadge, { backgroundColor: statusBadge.color }]}
+                      textStyle={styles.badgeText}
+                    />
+                  </View>
+                  
+                  <Text style={[styles.attendeeEmail, { color: colors.grey2 }]}>
                     {attendee.email}
                   </Text>
-                  <HStack spacing={4}>
-                    <Text fontSize="xs" color="neutral.500">
+                  
+                  <View style={styles.metaRow}>
+                    <Text style={[styles.metaText, { color: colors.grey3 }]}>
                       ID: {attendee.registrationId}
                     </Text>
                     {attendee.ticketType && (
-                      <Text fontSize="xs" color="neutral.500">
+                      <Text style={[styles.metaText, { color: colors.grey3 }]}>
                         Ticket: {attendee.ticketType}
                       </Text>
                     )}
-                  </HStack>
-                </VStack>
+                  </View>
+                  
+                  {isCheckedIn && attendee.checkedInAt && (
+                    <View style={styles.checkedInRow}>
+                      <Icon
+                        name="check-circle"
+                        type="material"
+                        color={colors.success}
+                        size={14}
+                      />
+                      <Text style={[styles.checkedInText, { color: colors.success }]}>
+                        Checked in at {new Date(attendee.checkedInAt).toLocaleString()}
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 
-                {isCheckedIn && attendee.checkedInAt && (
-                  <HStack spacing={1}>
-                    <InfoIcon color="green.500" boxSize={3} />
-                    <Text fontSize="xs" color="green.600">
-                      Checked in at {new Date(attendee.checkedInAt).toLocaleString()}
-                    </Text>
-                  </HStack>
-                )}
-              </VStack>
-              
-              <Box>
-                {canCheckIn ? (
-                  <Button
-                    colorScheme="primary"
-                    size="sm"
-                    leftIcon={<CheckIcon />}
-                    onClick={() => onCheckIn(attendee)}
-                    isLoading={isCheckingIn && checkingInId === attendee.id}
-                    loadingText="Checking in..."
-                    isDisabled={isCheckingIn}
-                  >
-                    Check In
-                  </Button>
-                ) : isCheckedIn ? (
-                  <Tooltip label="Already checked in" placement="left">
-                    <Box>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        colorScheme="green"
-                        leftIcon={<CheckIcon />}
-                        isDisabled
-                      >
-                        Checked In
-                      </Button>
-                    </Box>
-                  </Tooltip>
-                ) : (
-                  <Tooltip label="Cannot check in - registration not paid" placement="left">
-                    <Box>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        isDisabled
-                      >
-                        Not Eligible
-                      </Button>
-                    </Box>
-                  </Tooltip>
-                )}
-              </Box>
-            </HStack>
-          </Box>
-        );
-      })}
-    </VStack>
+                <View style={styles.actionContainer}>
+                  {canCheckIn ? (
+                    <Button
+                      title="Check In"
+                      onPress={() => onCheckIn(attendee)}
+                      loading={isCheckingIn && checkingInId === attendee.id}
+                      loadingProps={{ color: colors.white }}
+                      disabled={isCheckingIn}
+                      buttonStyle={[styles.checkInButton, { backgroundColor: colors.primary }]}
+                      titleStyle={styles.buttonTitle}
+                      icon={
+                        !isCheckingIn || checkingInId !== attendee.id ? (
+                          <Icon
+                            name="check"
+                            type="material"
+                            color={colors.white}
+                            size={16}
+                            containerStyle={styles.buttonIcon}
+                          />
+                        ) : undefined
+                      }
+                    />
+                  ) : isCheckedIn ? (
+                    <Button
+                      title="Checked In"
+                      disabled
+                      buttonStyle={[styles.checkInButton, styles.checkedButton, { 
+                        borderColor: colors.success 
+                      }]}
+                      titleStyle={[styles.buttonTitle, { color: colors.success }]}
+                      type="outline"
+                      icon={
+                        <Icon
+                          name="check"
+                          type="material"
+                          color={colors.success}
+                          size={16}
+                          containerStyle={styles.buttonIcon}
+                        />
+                      }
+                    />
+                  ) : (
+                    <Button
+                      title="Not Eligible"
+                      disabled
+                      buttonStyle={[styles.checkInButton, styles.disabledButton]}
+                      titleStyle={[styles.buttonTitle, { color: colors.grey3 }]}
+                      type="clear"
+                    />
+                  )}
+                </View>
+              </View>
+            </View>
+          );
+        })}
+      </ScrollView>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  centerContainer: {
+    paddingVertical: 48,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  errorIcon: {
+    marginRight: 8,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+  },
+  emptyContainer: {
+    padding: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  resultCount: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 12,
+  },
+  resultCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 12,
+    padding: 16,
+  },
+  cardContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  attendeeInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  attendeeName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  statusBadge: {
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  attendeeEmail: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  metaText: {
+    fontSize: 12,
+  },
+  checkedInRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  checkedInText: {
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  actionContainer: {
+    justifyContent: 'center',
+  },
+  checkInButton: {
+    borderRadius: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  checkedButton: {
+    backgroundColor: 'transparent',
+  },
+  disabledButton: {
+    backgroundColor: 'transparent',
+  },
+  buttonTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  buttonIcon: {
+    marginRight: 4,
+  },
+});

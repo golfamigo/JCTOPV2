@@ -1,19 +1,10 @@
 import React, { useState } from 'react';
-import {
-  Box,
-  Button,
-  FormControl,
-  FormLabel,
-  Input,
-  Textarea,
-  Select,
-  VStack,
-  HStack,
-  FormErrorMessage,
-  Heading,
-  useToast,
-} from '@chakra-ui/react';
+import { View, ScrollView, Alert, StyleSheet, Platform } from 'react-native';
+import { Button, Input, Text, Card } from '@rneui/themed';
+import { Picker } from '@react-native-picker/picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { CreateEventDto } from '@jctop-event/shared-types';
+import { useAppTheme } from '../../../theme';
 
 interface EventCreateFormProps {
   onSubmit: (eventData: CreateEventDto) => void;
@@ -48,7 +39,7 @@ const EventCreateForm: React.FC<EventCreateFormProps> = ({
   categories = [],
   venues = [],
 }) => {
-  const toast = useToast();
+  const { colors } = useAppTheme();
   const [formData, setFormData] = useState<FormData>({
     title: '',
     description: '',
@@ -58,217 +49,338 @@ const EventCreateForm: React.FC<EventCreateFormProps> = ({
     categoryId: '',
     venueId: '',
   });
-
+  
   const [errors, setErrors] = useState<FormErrors>({});
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
-
+    
     if (!formData.title.trim()) {
-      newErrors.title = 'Title is required';
-    } else if (formData.title.length > 255) {
-      newErrors.title = 'Title cannot exceed 255 characters';
+      newErrors.title = 'Event title is required';
     }
-
+    
+    if (!formData.description.trim()) {
+      newErrors.description = 'Event description is required';
+    }
+    
     if (!formData.startDate) {
       newErrors.startDate = 'Start date is required';
-    } else if (new Date(formData.startDate) <= new Date()) {
-      newErrors.startDate = 'Start date must be in the future';
     }
-
+    
     if (!formData.endDate) {
       newErrors.endDate = 'End date is required';
-    } else if (formData.startDate && new Date(formData.endDate) <= new Date(formData.startDate)) {
-      newErrors.endDate = 'End date must be after start date';
     }
-
+    
+    if (formData.startDate && formData.endDate) {
+      const start = new Date(formData.startDate);
+      const end = new Date(formData.endDate);
+      if (end < start) {
+        newErrors.endDate = 'End date must be after start date';
+      }
+    }
+    
     if (!formData.location.trim()) {
       newErrors.location = 'Location is required';
     }
-
-    if (!formData.categoryId) {
-      newErrors.categoryId = 'Category is required';
-    }
-
-    if (!formData.venueId) {
-      newErrors.venueId = 'Venue is required';
-    }
-
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
+    // Clear error for this field
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      toast({
-        title: 'Validation Error',
-        description: 'Please correct the errors in the form',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
+  const handleDateChange = (event: any, selectedDate: Date | undefined, type: 'start' | 'end') => {
+    if (type === 'start') {
+      setShowStartPicker(false);
+      if (selectedDate) {
+        setStartDate(selectedDate);
+        handleInputChange('startDate', selectedDate.toISOString());
+      }
+    } else {
+      setShowEndPicker(false);
+      if (selectedDate) {
+        setEndDate(selectedDate);
+        handleInputChange('endDate', selectedDate.toISOString());
+      }
     }
+  };
 
-    const eventData: CreateEventDto = {
-      title: formData.title.trim(),
-      description: formData.description.trim() || undefined,
-      startDate: formData.startDate,
-      endDate: formData.endDate,
-      location: formData.location.trim(),
-      categoryId: formData.categoryId,
-      venueId: formData.venueId,
-    };
-
-    onSubmit(eventData);
+  const handleSubmit = () => {
+    if (validateForm()) {
+      const eventData: CreateEventDto = {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        location: formData.location.trim(),
+        categoryId: formData.categoryId || undefined,
+        venueId: formData.venueId || undefined,
+      };
+      onSubmit(eventData);
+    }
   };
 
   return (
-    <Box maxW="600px" mx="auto" p={{ base: 4, md: 6 }}>
-      <Heading as="h1" size="xl" mb={6} color="neutral.900">
-        Create New Event
-      </Heading>
-
-      <form onSubmit={handleSubmit}>
-        <VStack spacing={6} align="stretch">
-          <FormControl isRequired isInvalid={!!errors.title}>
-            <FormLabel htmlFor="title">Event Title</FormLabel>
+    <ScrollView showsVerticalScrollIndicator={false}>
+      <Card containerStyle={[styles.card, { backgroundColor: colors.card }]}>
+        <Text h3 style={[styles.title, { color: colors.text }]}>
+          Create New Event
+        </Text>
+        
+        <View style={styles.formContainer}>
+          {/* Title */}
+          <View style={styles.formGroup}>
+            <Text style={[styles.label, { color: colors.text }]}>
+              Event Title *
+            </Text>
             <Input
-              id="title"
-              type="text"
-              value={formData.title}
-              onChange={(e) => handleInputChange('title', e.target.value)}
               placeholder="Enter event title"
-              size="md"
-              aria-describedby={errors.title ? 'title-error' : undefined}
+              value={formData.title}
+              onChangeText={(value) => handleInputChange('title', value)}
+              errorMessage={errors.title}
+              disabled={isLoading}
+              inputContainerStyle={[
+                styles.inputContainer,
+                { borderColor: errors.title ? colors.error : colors.grey4 }
+              ]}
             />
-            <FormErrorMessage id="title-error">{errors.title}</FormErrorMessage>
-          </FormControl>
+          </View>
 
-          <FormControl>
-            <FormLabel htmlFor="description">Description</FormLabel>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => handleInputChange('description', e.target.value)}
-              placeholder="Enter event description (optional)"
-              resize="vertical"
-              minH="100px"
-            />
-          </FormControl>
-
-          <HStack spacing={4} align="flex-start">
-            <FormControl isRequired isInvalid={!!errors.startDate} flex={1}>
-              <FormLabel htmlFor="startDate">Start Date & Time</FormLabel>
-              <Input
-                id="startDate"
-                type="datetime-local"
-                value={formData.startDate}
-                onChange={(e) => handleInputChange('startDate', e.target.value)}
-                size="md"
-                aria-describedby={errors.startDate ? 'start-date-error' : undefined}
-              />
-              <FormErrorMessage id="start-date-error">{errors.startDate}</FormErrorMessage>
-            </FormControl>
-
-            <FormControl isRequired isInvalid={!!errors.endDate} flex={1}>
-              <FormLabel htmlFor="endDate">End Date & Time</FormLabel>
-              <Input
-                id="endDate"
-                type="datetime-local"
-                value={formData.endDate}
-                onChange={(e) => handleInputChange('endDate', e.target.value)}
-                size="md"
-                aria-describedby={errors.endDate ? 'end-date-error' : undefined}
-              />
-              <FormErrorMessage id="end-date-error">{errors.endDate}</FormErrorMessage>
-            </FormControl>
-          </HStack>
-
-          <FormControl isRequired isInvalid={!!errors.location}>
-            <FormLabel htmlFor="location">Location</FormLabel>
+          {/* Description */}
+          <View style={styles.formGroup}>
+            <Text style={[styles.label, { color: colors.text }]}>
+              Description *
+            </Text>
             <Input
-              id="location"
-              type="text"
-              value={formData.location}
-              onChange={(e) => handleInputChange('location', e.target.value)}
-              placeholder="Enter event location"
-              size="md"
-              aria-describedby={errors.location ? 'location-error' : undefined}
+              placeholder="Enter event description"
+              value={formData.description}
+              onChangeText={(value) => handleInputChange('description', value)}
+              multiline
+              numberOfLines={4}
+              errorMessage={errors.description}
+              disabled={isLoading}
+              inputContainerStyle={[
+                styles.textAreaContainer,
+                { borderColor: errors.description ? colors.error : colors.grey4 }
+              ]}
+              inputStyle={{ textAlignVertical: 'top' }}
             />
-            <FormErrorMessage id="location-error">{errors.location}</FormErrorMessage>
-          </FormControl>
+          </View>
 
-          <HStack spacing={4} align="flex-start">
-            <FormControl isRequired isInvalid={!!errors.categoryId} flex={1}>
-              <FormLabel htmlFor="categoryId">Category</FormLabel>
-              <Select
-                id="categoryId"
-                value={formData.categoryId}
-                onChange={(e) => handleInputChange('categoryId', e.target.value)}
-                placeholder="Select a category"
-                size="md"
-                aria-describedby={errors.categoryId ? 'category-error' : undefined}
-              >
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </Select>
-              <FormErrorMessage id="category-error">{errors.categoryId}</FormErrorMessage>
-            </FormControl>
-
-            <FormControl isRequired isInvalid={!!errors.venueId} flex={1}>
-              <FormLabel htmlFor="venueId">Venue</FormLabel>
-              <Select
-                id="venueId"
-                value={formData.venueId}
-                onChange={(e) => handleInputChange('venueId', e.target.value)}
-                placeholder="Select a venue"
-                size="md"
-                aria-describedby={errors.venueId ? 'venue-error' : undefined}
-              >
-                {venues.map((venue) => (
-                  <option key={venue.id} value={venue.id}>
-                    {venue.name}
-                  </option>
-                ))}
-              </Select>
-              <FormErrorMessage id="venue-error">{errors.venueId}</FormErrorMessage>
-            </FormControl>
-          </HStack>
-
-          <Box pt={4}>
+          {/* Start Date */}
+          <View style={styles.formGroup}>
+            <Text style={[styles.label, { color: colors.text }]}>
+              Start Date *
+            </Text>
             <Button
-              type="submit"
-              colorScheme="primary"
-              size="lg"
-              width="full"
-              isLoading={isLoading}
-              loadingText="Creating Event..."
-              aria-describedby="create-button-help"
-            >
-              Create Event
-            </Button>
-            <Box id="create-button-help" fontSize="sm" color="secondary.500" mt={2} textAlign="center">
-              Event will be saved as a draft
-            </Box>
-          </Box>
-        </VStack>
-      </form>
-    </Box>
+              title={formData.startDate ? new Date(formData.startDate).toLocaleString() : 'Select start date'}
+              onPress={() => setShowStartPicker(true)}
+              type="outline"
+              buttonStyle={[
+                styles.dateButton,
+                { borderColor: errors.startDate ? colors.error : colors.grey4 }
+              ]}
+              titleStyle={{ color: formData.startDate ? colors.text : colors.grey3 }}
+            />
+            {errors.startDate && (
+              <Text style={[styles.errorText, { color: colors.error }]}>
+                {errors.startDate}
+              </Text>
+            )}
+            {showStartPicker && (
+              <DateTimePicker
+                value={startDate}
+                mode="datetime"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, date) => handleDateChange(event, date, 'start')}
+              />
+            )}
+          </View>
+
+          {/* End Date */}
+          <View style={styles.formGroup}>
+            <Text style={[styles.label, { color: colors.text }]}>
+              End Date *
+            </Text>
+            <Button
+              title={formData.endDate ? new Date(formData.endDate).toLocaleString() : 'Select end date'}
+              onPress={() => setShowEndPicker(true)}
+              type="outline"
+              buttonStyle={[
+                styles.dateButton,
+                { borderColor: errors.endDate ? colors.error : colors.grey4 }
+              ]}
+              titleStyle={{ color: formData.endDate ? colors.text : colors.grey3 }}
+            />
+            {errors.endDate && (
+              <Text style={[styles.errorText, { color: colors.error }]}>
+                {errors.endDate}
+              </Text>
+            )}
+            {showEndPicker && (
+              <DateTimePicker
+                value={endDate}
+                mode="datetime"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, date) => handleDateChange(event, date, 'end')}
+              />
+            )}
+          </View>
+
+          {/* Location */}
+          <View style={styles.formGroup}>
+            <Text style={[styles.label, { color: colors.text }]}>
+              Location *
+            </Text>
+            <Input
+              placeholder="Enter event location"
+              value={formData.location}
+              onChangeText={(value) => handleInputChange('location', value)}
+              errorMessage={errors.location}
+              disabled={isLoading}
+              inputContainerStyle={[
+                styles.inputContainer,
+                { borderColor: errors.location ? colors.error : colors.grey4 }
+              ]}
+            />
+          </View>
+
+          {/* Category */}
+          {categories.length > 0 && (
+            <View style={styles.formGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>
+                Category
+              </Text>
+              <View style={[styles.pickerContainer, { borderColor: colors.grey4 }]}>
+                <Picker
+                  selectedValue={formData.categoryId}
+                  onValueChange={(value) => handleInputChange('categoryId', value)}
+                  enabled={!isLoading}
+                  style={{ color: colors.text }}
+                >
+                  <Picker.Item label="Select a category" value="" />
+                  {categories.map(category => (
+                    <Picker.Item
+                      key={category.id}
+                      label={category.name}
+                      value={category.id}
+                    />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+          )}
+
+          {/* Venue */}
+          {venues.length > 0 && (
+            <View style={styles.formGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>
+                Venue
+              </Text>
+              <View style={[styles.pickerContainer, { borderColor: colors.grey4 }]}>
+                <Picker
+                  selectedValue={formData.venueId}
+                  onValueChange={(value) => handleInputChange('venueId', value)}
+                  enabled={!isLoading}
+                  style={{ color: colors.text }}
+                >
+                  <Picker.Item label="Select a venue" value="" />
+                  {venues.map(venue => (
+                    <Picker.Item
+                      key={venue.id}
+                      label={venue.name}
+                      value={venue.id}
+                    />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+          )}
+
+          {/* Submit Button */}
+          <Button
+            title="Create Event"
+            onPress={handleSubmit}
+            loading={isLoading}
+            disabled={isLoading}
+            buttonStyle={[styles.submitButton, { backgroundColor: colors.primary }]}
+          />
+        </View>
+      </Card>
+    </ScrollView>
   );
 };
+
+const styles = StyleSheet.create({
+  card: {
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  title: {
+    fontWeight: 'bold',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  formContainer: {
+    gap: 16,
+  },
+  formGroup: {
+    marginBottom: 8,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  inputContainer: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+  },
+  textAreaContainer: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    minHeight: 100,
+  },
+  dateButton: {
+    borderWidth: 1,
+    borderRadius: 8,
+    justifyContent: 'flex-start',
+    paddingHorizontal: 12,
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  errorText: {
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 12,
+  },
+  submitButton: {
+    borderRadius: 8,
+    paddingVertical: 12,
+    marginTop: 16,
+  },
+});
 
 export default EventCreateForm;

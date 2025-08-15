@@ -52,6 +52,27 @@ class PaymentService {
     return apiClient.delete<{ success: boolean }>(`/organizers/me/payment-providers/${providerId}`);
   }
 
+  // Additional provider management methods
+  async activateProvider(providerId: string): Promise<PaymentProvider> {
+    return apiClient.put<PaymentProvider>(`/organizers/me/payment-providers/${providerId}/activate`);
+  }
+
+  async deactivateProvider(providerId: string): Promise<PaymentProvider> {
+    return apiClient.put<PaymentProvider>(`/organizers/me/payment-providers/${providerId}/deactivate`);
+  }
+
+  async deleteProvider(providerId: string): Promise<{ success: boolean }> {
+    return apiClient.delete<{ success: boolean }>(`/organizers/me/payment-providers/${providerId}`);
+  }
+
+  async createProvider(providerData: PaymentProviderDto): Promise<PaymentProvider> {
+    return apiClient.post<PaymentProvider>('/organizers/me/payment-providers', providerData);
+  }
+
+  async updateProviderCredentials(providerId: string, credentials: any): Promise<PaymentProvider> {
+    return apiClient.put<PaymentProvider>(`/organizers/me/payment-providers/${providerId}/credentials`, credentials);
+  }
+
   // Utility methods for payment display
   formatAmount(amount: number, currency = 'TWD'): string {
     return new Intl.NumberFormat('zh-TW', {
@@ -72,6 +93,25 @@ class PaymentService {
       'refunded': '已退款'
     };
     return statusTexts[status] || '未知狀態';
+  }
+
+  async testCredentials(providerId: string, credentials: any): Promise<{ success: boolean; message?: string }> {
+    try {
+      const response = await apiClient.post<{ success: boolean; message?: string }>(
+        `/payment-providers/test`,
+        { providerId, credentials }
+      );
+      return response;
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Failed to test credentials'
+      };
+    }
+  }
+
+  async createPaymentProvider(data: PaymentProviderDto): Promise<PaymentProvider> {
+    return await apiClient.post<PaymentProvider>('/payment-providers', data);
   }
 
   getPaymentStatusColor(status: string): string {

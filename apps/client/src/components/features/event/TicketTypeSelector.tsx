@@ -1,22 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import {
-  VStack,
-  Box,
-  HStack,
-  Text,
-  Heading,
-  Alert,
-  AlertIcon,
-  AlertTitle,
-  AlertDescription,
-  Spinner,
-  useColorModeValue,
-  Badge,
-  Divider,
-} from '@chakra-ui/react';
+import { View, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
+import { Text, Card, Badge, Divider, Icon } from '@rneui/themed';
+import { useTranslation } from 'react-i18next';
 import { TicketTypeWithAvailability, TicketSelection } from '@jctop-event/shared-types';
 import TicketQuantityPicker from './TicketQuantityPicker';
 import ticketService from '../../../services/ticketService';
+import { useAppTheme } from '@/theme';
 
 interface TicketTypeSelectorProps {
   eventId: string;
@@ -31,29 +20,22 @@ const TicketTypeSelector: React.FC<TicketTypeSelectorProps> = ({
   initialSelections = [],
   isDisabled = false,
 }) => {
+  const { t } = useTranslation();
+  const { colors, spacing, typography } = useAppTheme();
   const [ticketTypes, setTicketTypes] = useState<TicketTypeWithAvailability[]>([]);
   const [selections, setSelections] = useState<TicketSelection[]>(initialSelections);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [clientValidationErrors, setClientValidationErrors] = useState<string[]>([]);
 
-  // Design system colors following branding guide
-  const cardBgColor = useColorModeValue('white', '#1E293B');
-  const borderColor = useColorModeValue('#E2E8F0', '#475569');
-  const primaryColor = '#2563EB';
-  const secondaryColor = '#475569';
-  const successColor = '#10B981';
-  const warningColor = '#FBBF24';
-  const errorColor = '#EF4444';
-  const neutralLight = '#F8FAFC';
-  const neutralMedium = '#64748B';
+  const windowWidth = Dimensions.get('window').width;
+  const isTablet = windowWidth >= 768;
 
   useEffect(() => {
     fetchTicketTypes();
   }, [eventId]);
 
   useEffect(() => {
-    // Calculate total price and validate selections
     const totalPrice = ticketService.calculateTotalPrice(ticketTypes, selections);
     const validation = ticketService.validateSelectionClientSide(ticketTypes, selections);
     
@@ -68,7 +50,7 @@ const TicketTypeSelector: React.FC<TicketTypeSelectorProps> = ({
       const types = await ticketService.getTicketTypesWithAvailability(eventId);
       setTicketTypes(types);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load ticket information');
+      setError(err instanceof Error ? err.message : t('registration.errors.loadTicketsFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -91,174 +73,322 @@ const TicketTypeSelector: React.FC<TicketTypeSelectorProps> = ({
     return selection ? selection.quantity : 0;
   };
 
-  const formatPrice = (price: number): string => {
-    return new Intl.NumberFormat('en-US', {
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('zh-TW', {
       style: 'currency',
-      currency: 'USD',
-    }).format(price);
+      currency: 'TWD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
   };
 
   const getTotalSelectedQuantity = (): number => {
     return selections.reduce((total, selection) => total + selection.quantity, 0);
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      width: '100%',
+    },
+    loadingContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: spacing.xl * 2,
+    },
+    loadingText: {
+      ...typography.body,
+      color: colors.midGrey,
+      marginTop: spacing.md,
+    },
+    errorContainer: {
+      backgroundColor: colors.danger + '10',
+      borderColor: colors.danger,
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: spacing.md,
+    },
+    errorTitle: {
+      ...typography.body,
+      fontWeight: '600',
+      color: colors.danger,
+      marginBottom: spacing.xs,
+    },
+    errorDescription: {
+      ...typography.small,
+      color: colors.danger,
+    },
+    infoContainer: {
+      backgroundColor: colors.primary + '10',
+      borderColor: colors.primary,
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: spacing.md,
+    },
+    infoTitle: {
+      ...typography.body,
+      fontWeight: '600',
+      color: colors.primary,
+      marginBottom: spacing.xs,
+    },
+    infoDescription: {
+      ...typography.small,
+      color: colors.primary,
+    },
+    header: {
+      marginBottom: spacing.md,
+    },
+    headerTitle: {
+      ...typography.h2,
+      color: colors.primary,
+      marginBottom: spacing.xs,
+    },
+    headerSubtitle: {
+      ...typography.small,
+      color: colors.midGrey,
+    },
+    validationErrorContainer: {
+      backgroundColor: colors.danger + '10',
+      borderColor: colors.danger,
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+    },
+    validationErrorTitle: {
+      ...typography.body,
+      fontWeight: '600',
+      color: colors.danger,
+      marginBottom: spacing.sm,
+    },
+    validationErrorItem: {
+      ...typography.small,
+      color: colors.danger,
+      marginBottom: spacing.xs,
+    },
+    ticketCard: {
+      marginBottom: spacing.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      padding: spacing.md,
+    },
+    ticketCardSelected: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary + '05',
+    },
+    ticketHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: spacing.sm,
+    },
+    ticketInfo: {
+      flex: 1,
+      marginRight: spacing.md,
+    },
+    ticketName: {
+      ...typography.body,
+      fontWeight: '600',
+      color: colors.primary,
+      marginBottom: spacing.xs,
+    },
+    ticketPrice: {
+      ...typography.h2,
+      fontWeight: 'bold',
+      color: colors.primary,
+      marginBottom: spacing.xs,
+    },
+    availabilityText: {
+      ...typography.small,
+      color: colors.success,
+      marginBottom: spacing.xs,
+    },
+    soldText: {
+      ...typography.small,
+      color: colors.midGrey,
+    },
+    quantitySection: {
+      alignItems: isTablet ? 'flex-end' : 'center',
+    },
+    subtotalText: {
+      ...typography.small,
+      color: colors.primary,
+      fontWeight: '600',
+      marginTop: spacing.xs,
+    },
+    summaryContainer: {
+      backgroundColor: colors.lightGrey,
+      borderRadius: 8,
+      padding: spacing.md,
+      marginTop: spacing.md,
+    },
+    summaryRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    summaryLabel: {
+      ...typography.body,
+      fontWeight: '600',
+      color: colors.primary,
+    },
+    summaryCount: {
+      ...typography.small,
+      color: colors.midGrey,
+      marginTop: spacing.xs,
+    },
+    summaryTotal: {
+      ...typography.h2,
+      fontWeight: 'bold',
+      color: colors.primary,
+    },
+  });
+
   if (isLoading) {
     return (
-      <Box textAlign="center" py={8}>
-        <Spinner color={primaryColor} size="xl" />
-        <Text mt={4} color={neutralMedium}>Loading ticket information...</Text>
-      </Box>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>{t('registration.loadingTickets')}</Text>
+      </View>
     );
   }
 
   if (error) {
     return (
-      <Alert status="error" borderRadius="md">
-        <AlertIcon />
-        <Box>
-          <AlertTitle>Unable to load ticket information</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Box>
-      </Alert>
+      <View style={styles.errorContainer}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Icon name="alert-circle" type="material-community" size={24} color={colors.danger} />
+          <View style={{ marginLeft: spacing.sm, flex: 1 }}>
+            <Text style={styles.errorTitle}>{t('registration.errors.unableToLoadTickets')}</Text>
+            <Text style={styles.errorDescription}>{error}</Text>
+          </View>
+        </View>
+      </View>
     );
   }
 
   if (ticketTypes.length === 0) {
     return (
-      <Alert status="info" borderRadius="md">
-        <AlertIcon />
-        <Box>
-          <AlertTitle>No tickets available</AlertTitle>
-          <AlertDescription>
-            Ticket sales have not started yet or all tickets have been sold.
-          </AlertDescription>
-        </Box>
-      </Alert>
+      <View style={styles.infoContainer}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Icon name="information" type="material-community" size={24} color={colors.primary} />
+          <View style={{ marginLeft: spacing.sm, flex: 1 }}>
+            <Text style={styles.infoTitle}>{t('registration.noTicketsAvailable')}</Text>
+            <Text style={styles.infoDescription}>{t('registration.noTicketsDescription')}</Text>
+          </View>
+        </View>
+      </View>
     );
   }
 
   return (
-    <VStack spacing={6} align="stretch">
-      <Box>
-        <Heading size="md" color={primaryColor} mb={2}>
-          Select Tickets
-        </Heading>
-        <Text color={neutralMedium} fontSize="sm">
-          Choose the type and quantity of tickets you'd like to purchase
-        </Text>
-      </Box>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>{t('registration.selectTickets')}</Text>
+        <Text style={styles.headerSubtitle}>{t('registration.selectTicketsDescription')}</Text>
+      </View>
 
       {clientValidationErrors.length > 0 && (
-        <Alert status="error" borderRadius="md">
-          <AlertIcon />
-          <Box>
-            <AlertTitle>Selection Error</AlertTitle>
-            <VStack align="start" spacing={1} mt={2}>
+        <View style={styles.validationErrorContainer}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+            <Icon name="alert-circle" type="material-community" size={24} color={colors.danger} />
+            <View style={{ marginLeft: spacing.sm, flex: 1 }}>
+              <Text style={styles.validationErrorTitle}>{t('registration.errors.selectionError')}</Text>
               {clientValidationErrors.map((error, index) => (
-                <Text key={index} fontSize="sm">{error}</Text>
+                <Text key={index} style={styles.validationErrorItem}>• {error}</Text>
               ))}
-            </VStack>
-          </Box>
-        </Alert>
+            </View>
+          </View>
+        </View>
       )}
 
-      <VStack spacing={4} align="stretch">
-        {ticketTypes.map((ticketType) => {
-          const selectedQuantity = getQuantityForTicketType(ticketType.id);
-          const isAvailable = ticketType.availableQuantity > 0;
-          const isSoldOut = ticketType.availableQuantity === 0;
+      {ticketTypes.map((ticketType) => {
+        const selectedQuantity = getQuantityForTicketType(ticketType.id);
+        const isAvailable = ticketType.availableQuantity > 0;
+        const isSoldOut = ticketType.availableQuantity === 0;
 
-          return (
-            <Box
-              key={ticketType.id}
-              p={6}
-              borderWidth={1}
-              borderRadius="md"
-              borderColor={selectedQuantity > 0 ? primaryColor : borderColor}
-              backgroundColor={selectedQuantity > 0 ? `${primaryColor}05` : cardBgColor}
-              opacity={isDisabled || isSoldOut ? 0.6 : 1}
-              transition="all 0.2s"
-              _hover={isAvailable && !isDisabled ? {
-                borderColor: primaryColor,
-                boxShadow: `0 0 0 1px ${primaryColor}40`,
-              } : {}}
-            >
-              <HStack justify="between" align="start" spacing={4}>
-                <VStack align="start" spacing={3} flex={1}>
-                  <HStack align="center" spacing={3}>
-                    <Heading size="sm" color={primaryColor}>
-                      {ticketType.name}
-                    </Heading>
-                    {isSoldOut && (
-                      <Badge colorScheme="red" variant="solid">
-                        Sold Out
-                      </Badge>
-                    )}
-                    {!isSoldOut && ticketType.availableQuantity <= 10 && (
-                      <Badge colorScheme="orange" variant="solid">
-                        {ticketType.availableQuantity} left
-                      </Badge>
-                    )}
-                  </HStack>
-
-                  <Text fontSize="xl" fontWeight="semibold" color={primaryColor}>
-                    {formatPrice(ticketType.price)}
-                  </Text>
-
-                  <VStack align="start" spacing={1}>
-                    <Text fontSize="sm" color={successColor}>
-                      {ticketType.availableQuantity} of {ticketType.totalQuantity} available
-                    </Text>
-                    {ticketType.soldQuantity > 0 && (
-                      <Text fontSize="sm" color={neutralMedium}>
-                        {ticketType.soldQuantity} already sold
-                      </Text>
-                    )}
-                  </VStack>
-                </VStack>
-
-                <VStack align="end" spacing={2}>
-                  <TicketQuantityPicker
-                    value={selectedQuantity}
-                    max={Math.min(ticketType.availableQuantity, 10)} // Limit to 10 per type
-                    onChange={(quantity) => handleQuantityChange(ticketType.id, quantity)}
-                    isDisabled={isDisabled || isSoldOut}
-                    aria-label={`${ticketType.name} quantity selector`}
-                  />
-                  
-                  {selectedQuantity > 0 && (
-                    <Text fontSize="sm" color={primaryColor} fontWeight="medium">
-                      {selectedQuantity} × {formatPrice(ticketType.price)} = {formatPrice(selectedQuantity * ticketType.price)}
-                    </Text>
+        return (
+          <View
+            key={ticketType.id}
+            style={[
+              styles.ticketCard,
+              selectedQuantity > 0 && styles.ticketCardSelected,
+              (isDisabled || isSoldOut) && { opacity: 0.6 }
+            ]}
+          >
+            <View style={styles.ticketHeader}>
+              <View style={styles.ticketInfo}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
+                  <Text style={styles.ticketName}>{ticketType.name}</Text>
+                  {isSoldOut && (
+                    <Badge
+                      value={t('registration.soldOut')}
+                      status="error"
+                      containerStyle={{ marginLeft: spacing.sm }}
+                    />
                   )}
-                </VStack>
-              </HStack>
-            </Box>
-          );
-        })}
-      </VStack>
+                  {!isSoldOut && ticketType.availableQuantity <= 10 && (
+                    <Badge
+                      value={t('registration.limitedAvailable', { count: ticketType.availableQuantity })}
+                      status="warning"
+                      containerStyle={{ marginLeft: spacing.sm }}
+                    />
+                  )}
+                </View>
+
+                <Text style={styles.ticketPrice}>{formatCurrency(ticketType.price)}</Text>
+
+                <Text style={styles.availabilityText}>
+                  {t('registration.availableTickets', { 
+                    available: ticketType.availableQuantity, 
+                    total: ticketType.totalQuantity 
+                  })}
+                </Text>
+                {ticketType.soldQuantity > 0 && (
+                  <Text style={styles.soldText}>
+                    {t('registration.soldTickets', { count: ticketType.soldQuantity })}
+                  </Text>
+                )}
+              </View>
+
+              <View style={styles.quantitySection}>
+                <TicketQuantityPicker
+                  value={selectedQuantity}
+                  max={Math.min(ticketType.availableQuantity, 10)}
+                  onChange={(quantity) => handleQuantityChange(ticketType.id, quantity)}
+                  isDisabled={isDisabled || isSoldOut}
+                />
+                
+                {selectedQuantity > 0 && (
+                  <Text style={styles.subtotalText}>
+                    {formatCurrency(selectedQuantity * ticketType.price)}
+                  </Text>
+                )}
+              </View>
+            </View>
+          </View>
+        );
+      })}
 
       {getTotalSelectedQuantity() > 0 && (
         <>
-          <Divider />
-          <Box p={4} backgroundColor={neutralLight} borderRadius="md">
-            <HStack justify="between" align="center">
-              <VStack align="start" spacing={1}>
-                <Text fontWeight="semibold" color={primaryColor}>
-                  Total Selected
+          <Divider style={{ marginVertical: spacing.md }} />
+          <View style={styles.summaryContainer}>
+            <View style={styles.summaryRow}>
+              <View>
+                <Text style={styles.summaryLabel}>{t('registration.totalSelected')}</Text>
+                <Text style={styles.summaryCount}>
+                  {t('registration.ticketsCount', { count: getTotalSelectedQuantity() })}
                 </Text>
-                <Text fontSize="sm" color={neutralMedium}>
-                  {getTotalSelectedQuantity()} ticket{getTotalSelectedQuantity() !== 1 ? 's' : ''}
-                </Text>
-              </VStack>
-              <Text fontSize="xl" fontWeight="bold" color={primaryColor}>
-                {formatPrice(ticketService.calculateTotalPrice(ticketTypes, selections))}
+              </View>
+              <Text style={styles.summaryTotal}>
+                {formatCurrency(ticketService.calculateTotalPrice(ticketTypes, selections))}
               </Text>
-            </HStack>
-          </Box>
+            </View>
+          </View>
         </>
       )}
-    </VStack>
+    </View>
   );
 };
 

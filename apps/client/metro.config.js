@@ -16,4 +16,12 @@ config.resolver.nodeModulesPaths = [
   path.resolve(__dirname, './node_modules'),
 ];
 
+// Exclude test files from the bundle
+config.resolver.blockList = [
+  /.*\.spec\.(js|jsx|ts|tsx)$/,
+  /.*\.test\.(js|jsx|ts|tsx)$/,
+  /.*\/__tests__\/.*/,
+  /.*\/__mocks__\/.*/,
+];
+
 module.exports = config;

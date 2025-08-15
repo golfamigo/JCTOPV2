@@ -1,25 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Button,
-  VStack,
-  HStack,
-  Heading,
-  Text,
-  SimpleGrid,
-  Alert,
-  AlertIcon,
-  Spinner,
-  useDisclosure,
-  useToast,
-  Flex,
-  Badge,
-} from '@chakra-ui/react';
-import { AddIcon } from '@chakra-ui/icons';
+import { View, StyleSheet, ScrollView, ActivityIndicator, Alert, RefreshControl } from 'react-native';
+import { Button, Text, Card, Icon } from '@rneui/themed';
+import { MaterialIcons } from '@expo/vector-icons';
 import { DiscountCodeResponse, CreateDiscountCodeDto, UpdateDiscountCodeDto } from '@jctop-event/shared-types';
 import discountCodeService from '../../../services/discountCodeService';
 import DiscountCodeForm from './DiscountCodeForm';
 import DiscountCodeCard from './DiscountCodeCard';
+import { useAppTheme } from '../../../theme';
 
 interface DiscountCodeListProps {
   eventId: string;
@@ -28,20 +15,25 @@ interface DiscountCodeListProps {
 const DiscountCodeList: React.FC<DiscountCodeListProps> = ({ eventId }) => {
   const [discountCodes, setDiscountCodes] = useState<DiscountCodeResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingCode, setEditingCode] = useState<DiscountCodeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
   
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const toast = useToast();
+  const { colors } = useAppTheme();
 
   useEffect(() => {
     loadDiscountCodes();
   }, [eventId]);
 
-  const loadDiscountCodes = async () => {
+  const loadDiscountCodes = async (isRefresh = false) => {
     try {
-      setIsLoading(true);
+      if (isRefresh) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
       setError(null);
       const codes = await discountCodeService.getDiscountCodes(eventId);
       setDiscountCodes(codes);
@@ -50,6 +42,7 @@ const DiscountCodeList: React.FC<DiscountCodeListProps> = ({ eventId }) => {
       setError(error instanceof Error ? error.message : 'Failed to load discount codes');
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -58,6 +51,7 @@ const DiscountCodeList: React.FC<DiscountCodeListProps> = ({ eventId }) => {
     try {
       const newCode = await discountCodeService.createDiscountCode(eventId, data);
       setDiscountCodes(prev => [newCode, ...prev]);
+      setShowForm(false);
     } catch (error) {
       throw error; // Re-throw to be handled by the form
     } finally {
@@ -79,6 +73,7 @@ const DiscountCodeList: React.FC<DiscountCodeListProps> = ({ eventId }) => {
         prev.map(code => code.id === editingCode.id ? updatedCode : code)
       );
       setEditingCode(null);
+      setShowForm(false);
     } catch (error) {
       throw error; // Re-throw to be handled by the form
     } finally {
@@ -91,31 +86,23 @@ const DiscountCodeList: React.FC<DiscountCodeListProps> = ({ eventId }) => {
       await discountCodeService.deleteDiscountCode(eventId, codeId);
       setDiscountCodes(prev => prev.filter(code => code.id !== codeId));
       
-      toast({
-        title: 'Discount code deleted successfully',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
+      Alert.alert('Success', 'Discount code deleted successfully');
     } catch (error) {
-      toast({
-        title: 'Failed to delete discount code',
-        description: error instanceof Error ? error.message : 'An unexpected error occurred',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      Alert.alert(
+        'Error',
+        `Failed to delete discount code: ${error instanceof Error ? error.message : 'An unexpected error occurred'}`
+      );
     }
   };
 
   const handleEditCode = (code: DiscountCodeResponse) => {
     setEditingCode(code);
-    onOpen();
+    setShowForm(true);
   };
 
   const handleCloseForm = () => {
     setEditingCode(null);
-    onClose();
+    setShowForm(false);
   };
 
   const getStatsData = () => {
@@ -132,86 +119,136 @@ const DiscountCodeList: React.FC<DiscountCodeListProps> = ({ eventId }) => {
 
   if (isLoading) {
     return (
-      <Box textAlign="center" py={8}>
-        <Spinner size="lg" />
-        <Text mt={4}>Loading discount codes...</Text>
-      </Box>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.grey2 }]}>
+          Loading discount codes...
+        </Text>
+      </View>
     );
   }
 
   return (
-    <Box>
-      <VStack align="stretch" spacing={6}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => loadDiscountCodes(true)}
+            colors={[colors.primary]}
+          />
+        }
+      >
         {/* Header */}
-        <Flex justify="space-between" align="center" wrap="wrap" gap={4}>
-          <VStack align="flex-start" spacing={1}>
-            <Heading size="lg">Discount Codes</Heading>
-            <Text color="gray.600">
+        <View style={styles.header}>
+          <View style={styles.headerText}>
+            <Text h3 style={[styles.title, { color: colors.text }]}>
+              Discount Codes
+            </Text>
+            <Text style={[styles.subtitle, { color: colors.grey2 }]}>
               Manage promotional codes for your event
             </Text>
-          </VStack>
+          </View>
           
           <Button
-            leftIcon={<AddIcon />}
-            colorScheme="blue"
-            onClick={onOpen}
-            isDisabled={isLoading}
-          >
-            Create Discount Code
-          </Button>
-        </Flex>
+            title="Create Code"
+            onPress={() => setShowForm(true)}
+            disabled={isLoading}
+            buttonStyle={[styles.createButton, { backgroundColor: colors.primary }]}
+            icon={
+              <Icon
+                name="add"
+                type="material"
+                color={colors.white}
+                size={20}
+                containerStyle={styles.buttonIcon}
+              />
+            }
+          />
+        </View>
 
         {/* Stats */}
-        <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
-          <Box p={4} bg="blue.50" borderRadius="md" textAlign="center">
-            <Text fontSize="2xl" fontWeight="bold" color="blue.600">
+        <View style={styles.statsContainer}>
+          <Card containerStyle={[styles.statCard, { backgroundColor: colors.primary + '10' }]}>
+            <Text style={[styles.statValue, { color: colors.primary }]}>
               {totalCodes}
             </Text>
-            <Text fontSize="sm" color="gray.600">Total Codes</Text>
-          </Box>
+            <Text style={[styles.statLabel, { color: colors.grey2 }]}>
+              Total Codes
+            </Text>
+          </Card>
           
-          <Box p={4} bg="green.50" borderRadius="md" textAlign="center">
-            <Text fontSize="2xl" fontWeight="bold" color="green.600">
+          <Card containerStyle={[styles.statCard, { backgroundColor: colors.success + '10' }]}>
+            <Text style={[styles.statValue, { color: colors.success }]}>
               {activeCodes}
             </Text>
-            <Text fontSize="sm" color="gray.600">Active Codes</Text>
-          </Box>
+            <Text style={[styles.statLabel, { color: colors.grey2 }]}>
+              Active Codes
+            </Text>
+          </Card>
           
-          <Box p={4} bg="purple.50" borderRadius="md" textAlign="center">
-            <Text fontSize="2xl" fontWeight="bold" color="purple.600">
+          <Card containerStyle={[styles.statCard, { backgroundColor: colors.secondary + '10' }]}>
+            <Text style={[styles.statValue, { color: colors.secondary }]}>
               {totalUsage}
             </Text>
-            <Text fontSize="sm" color="gray.600">Total Usage</Text>
-          </Box>
-        </SimpleGrid>
+            <Text style={[styles.statLabel, { color: colors.grey2 }]}>
+              Total Usage
+            </Text>
+          </Card>
+        </View>
 
         {/* Error State */}
         {error && (
-          <Alert status="error">
-            <AlertIcon />
-            {error}
-          </Alert>
+          <View style={[styles.errorContainer, { 
+            backgroundColor: colors.error + '10',
+            borderColor: colors.error 
+          }]}>
+            <Icon
+              name="error"
+              type="material"
+              color={colors.error}
+              size={20}
+              containerStyle={styles.errorIcon}
+            />
+            <Text style={[styles.errorText, { color: colors.error }]}>
+              {error}
+            </Text>
+          </View>
         )}
 
         {/* Discount Codes List */}
         {discountCodes.length === 0 ? (
-          <Box textAlign="center" py={12}>
-            <Text fontSize="lg" color="gray.500" mb={4}>
+          <View style={[styles.emptyContainer, { backgroundColor: colors.card }]}>
+            <Icon
+              name="local-offer"
+              type="material"
+              color={colors.grey3}
+              size={48}
+            />
+            <Text style={[styles.emptyTitle, { color: colors.grey2 }]}>
               No discount codes created yet
             </Text>
-            <Text color="gray.400" mb={6}>
+            <Text style={[styles.emptySubtitle, { color: colors.grey3 }]}>
               Create your first discount code to start offering promotions to your customers
             </Text>
             <Button
-              leftIcon={<AddIcon />}
-              colorScheme="blue"
-              onClick={onOpen}
-            >
-              Create Your First Discount Code
-            </Button>
-          </Box>
+              title="Create Your First Discount Code"
+              onPress={() => setShowForm(true)}
+              buttonStyle={[styles.createButton, { backgroundColor: colors.primary }]}
+              icon={
+                <Icon
+                  name="add"
+                  type="material"
+                  color={colors.white}
+                  size={20}
+                  containerStyle={styles.buttonIcon}
+                />
+              }
+            />
+          </View>
         ) : (
-          <SimpleGrid columns={{ base: 1, lg: 2, xl: 3 }} spacing={4}>
+          <View style={styles.listContainer}>
             {discountCodes.map((code) => (
               <DiscountCodeCard
                 key={code.id}
@@ -221,20 +258,116 @@ const DiscountCodeList: React.FC<DiscountCodeListProps> = ({ eventId }) => {
                 isLoading={isSubmitting}
               />
             ))}
-          </SimpleGrid>
+          </View>
         )}
-      </VStack>
+      </ScrollView>
 
       {/* Form Modal */}
       <DiscountCodeForm
-        isOpen={isOpen}
+        isOpen={showForm}
         onClose={handleCloseForm}
-        onSubmit={editingCode ? handleUpdateCode : handleCreateCode}
+        onSubmit={editingCode ? handleUpdateCode as any : handleCreateCode as any}
         initialData={editingCode || undefined}
         isLoading={isSubmitting}
       />
-    </Box>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+  },
+  headerText: {
+    flex: 1,
+  },
+  title: {
+    fontWeight: 'bold',
+  },
+  subtitle: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+  createButton: {
+    borderRadius: 8,
+    paddingHorizontal: 16,
+  },
+  buttonIcon: {
+    marginRight: 8,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  statCard: {
+    flex: 1,
+    marginHorizontal: 4,
+    borderRadius: 8,
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  statLabel: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  errorIcon: {
+    marginRight: 8,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+  },
+  emptyContainer: {
+    margin: 16,
+    padding: 32,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '500',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  listContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+});
 
 export default DiscountCodeList;

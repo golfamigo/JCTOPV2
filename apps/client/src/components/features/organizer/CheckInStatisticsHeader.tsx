@@ -1,21 +1,9 @@
 import React from 'react';
-import {
-  HStack,
-  Card,
-  CardBody,
-  Stat,
-  StatLabel,
-  StatNumber,
-  StatHelpText,
-  Spinner,
-  useColorModeValue,
-  IconButton,
-  Tooltip,
-  Alert,
-  AlertIcon,
-} from '@chakra-ui/react';
-import { RepeatIcon } from '@chakra-ui/icons';
+import { View, StyleSheet, ActivityIndicator, TouchableOpacity, Alert as RNAlert } from 'react-native';
+import { Card, Text, Icon } from '@rneui/themed';
+import { MaterialIcons } from '@expo/vector-icons';
 import { EventStatistics } from '../../../services/statisticsService';
+import { useAppTheme } from '../../../theme';
 
 interface CheckInStatisticsHeaderProps {
   statistics: EventStatistics | null;
@@ -32,31 +20,38 @@ export const CheckInStatisticsHeader: React.FC<CheckInStatisticsHeaderProps> = (
   onRefresh,
   isRefreshing = false,
 }) => {
-  const cardBgColor = useColorModeValue('white', 'neutral.800');
-  const borderColor = useColorModeValue('neutral.200', 'neutral.600');
+  const { colors } = useAppTheme();
 
   const getAttendanceRateColor = (rate: number) => {
-    if (rate >= 70) return 'success.600';
-    if (rate >= 40) return 'warning.600';
-    return 'error.600';
+    if (rate >= 70) return colors.success;
+    if (rate >= 40) return colors.warning;
+    return colors.error;
   };
 
   if (isLoading && !statistics) {
     return (
-      <Card bg={cardBgColor} borderColor={borderColor} border="1px solid">
-        <CardBody textAlign="center" py={8}>
-          <Spinner size="lg" color="primary.500" />
-        </CardBody>
+      <Card containerStyle={[styles.loadingCard, { backgroundColor: colors.card, borderColor: colors.grey4 }]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
       </Card>
     );
   }
 
   if (error && !statistics) {
     return (
-      <Alert status="error">
-        <AlertIcon />
-        Failed to load statistics: {error}
-      </Alert>
+      <View style={[styles.errorContainer, { backgroundColor: colors.error + '10', borderColor: colors.error }]}>
+        <Icon
+          name="error"
+          type="material"
+          color={colors.error}
+          size={20}
+          containerStyle={styles.errorIcon}
+        />
+        <Text style={[styles.errorText, { color: colors.error }]}>
+          Failed to load statistics: {error}
+        </Text>
+      </View>
     );
   }
 
@@ -65,70 +60,139 @@ export const CheckInStatisticsHeader: React.FC<CheckInStatisticsHeaderProps> = (
   }
 
   return (
-    <HStack spacing={6} justify="center" position="relative">
+    <View style={styles.container}>
       {/* Refresh Button */}
-      <Tooltip label="Refresh Statistics" placement="top">
-        <IconButton
-          aria-label="Refresh statistics"
-          icon={<RepeatIcon />}
-          variant="ghost"
-          colorScheme="primary"
-          position="absolute"
-          top="8px"
-          right="8px"
-          zIndex={1}
-          isLoading={isRefreshing}
-          onClick={onRefresh}
-          size="sm"
-        />
-      </Tooltip>
+      <TouchableOpacity
+        onPress={onRefresh}
+        disabled={isRefreshing}
+        style={styles.refreshButton}
+        activeOpacity={0.7}
+      >
+        {isRefreshing ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          <Icon
+            name="refresh"
+            type="material"
+            color={colors.primary}
+            size={24}
+          />
+        )}
+      </TouchableOpacity>
 
-      {/* Total Registrations */}
-      <Card bg={cardBgColor} borderColor={borderColor} border="1px solid" flex={1}>
-        <CardBody textAlign="center">
-          <Stat>
-            <StatLabel color="neutral.600">Total Registrations</StatLabel>
-            <StatNumber color="primary.600" fontSize="3xl">
+      <View style={styles.statsContainer}>
+        {/* Total Registrations */}
+        <Card containerStyle={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.grey4 }]}>
+          <View style={styles.statContent}>
+            <Text style={[styles.statLabel, { color: colors.grey2 }]}>
+              Total Registrations
+            </Text>
+            <Text style={[styles.statNumber, { color: colors.primary }]}>
               {statistics.totalRegistrations.toLocaleString()}
-            </StatNumber>
-          </Stat>
-        </CardBody>
-      </Card>
-      
-      {/* Checked In */}
-      <Card bg={cardBgColor} borderColor={borderColor} border="1px solid" flex={1}>
-        <CardBody textAlign="center">
-          <Stat>
-            <StatLabel color="neutral.600">Checked In</StatLabel>
-            <StatNumber color="success.600" fontSize="3xl">
+            </Text>
+          </View>
+        </Card>
+        
+        {/* Checked In */}
+        <Card containerStyle={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.grey4 }]}>
+          <View style={styles.statContent}>
+            <Text style={[styles.statLabel, { color: colors.grey2 }]}>
+              Checked In
+            </Text>
+            <Text style={[styles.statNumber, { color: colors.success }]}>
               {statistics.checkedInCount.toLocaleString()}
-            </StatNumber>
-            <StatHelpText color="success.600">
+            </Text>
+            <Text style={[styles.statHelp, { color: colors.success }]}>
               {statistics.totalRegistrations > 0 ? statistics.attendanceRate.toFixed(1) : '0.0'}%
-            </StatHelpText>
-          </Stat>
-        </CardBody>
-      </Card>
-      
-      {/* Pending */}
-      <Card bg={cardBgColor} borderColor={borderColor} border="1px solid" flex={1}>
-        <CardBody textAlign="center">
-          <Stat>
-            <StatLabel color="neutral.600">Pending</StatLabel>
-            <StatNumber 
-              color={getAttendanceRateColor(100 - statistics.attendanceRate)} 
-              fontSize="3xl"
-            >
+            </Text>
+          </View>
+        </Card>
+        
+        {/* Pending */}
+        <Card containerStyle={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.grey4 }]}>
+          <View style={styles.statContent}>
+            <Text style={[styles.statLabel, { color: colors.grey2 }]}>
+              Pending
+            </Text>
+            <Text style={[
+              styles.statNumber, 
+              { color: getAttendanceRateColor(100 - statistics.attendanceRate) }
+            ]}>
               {(statistics.totalRegistrations - statistics.checkedInCount).toLocaleString()}
-            </StatNumber>
-            <StatHelpText 
-              color={getAttendanceRateColor(100 - statistics.attendanceRate)}
-            >
+            </Text>
+            <Text style={[
+              styles.statHelp,
+              { color: getAttendanceRateColor(100 - statistics.attendanceRate) }
+            ]}>
               {statistics.totalRegistrations > 0 ? (100 - statistics.attendanceRate).toFixed(1) : '100.0'}%
-            </StatHelpText>
-          </Stat>
-        </CardBody>
-      </Card>
-    </HStack>
+            </Text>
+          </View>
+        </Card>
+      </View>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    position: 'relative',
+  },
+  loadingCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  loadingContainer: {
+    paddingVertical: 32,
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  errorIcon: {
+    marginRight: 8,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+  },
+  refreshButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 1,
+    padding: 8,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 20,
+  },
+  statContent: {
+    alignItems: 'center',
+  },
+  statLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  statNumber: {
+    fontSize: 28,
+    fontWeight: 'bold',
+  },
+  statHelp: {
+    fontSize: 14,
+    marginTop: 4,
+    fontWeight: '500',
+  },
+});

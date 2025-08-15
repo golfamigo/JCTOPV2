@@ -1,55 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Container,
-  VStack,
-  HStack,
-  Heading,
-  Text,
-  Button,
-  Alert,
-  AlertIcon,
-  Spinner,
-  Center,
-  useColorModeValue,
-  useToast,
-  SimpleGrid,
-  Card,
-  CardHeader,
-  CardBody,
-  Stat,
-  StatLabel,
-  StatNumber,
-  StatHelpText,
-  Divider,
-  Badge,
-  IconButton,
-  Tooltip,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
-  Flex,
-} from '@chakra-ui/react';
+  View,
+  ScrollView,
+  RefreshControl,
+  StyleSheet,
+  ActivityIndicator,
+} from 'react-native';
 import {
-  ArrowBackIcon,
-  DownloadIcon,
-  RepeatIcon,
-  ChevronDownIcon,
-  CalendarIcon,
-  AttachmentIcon,
-} from '@chakra-ui/icons';
-import { useNavigate, useParams } from 'react-router-dom';
+  Text,
+  Card,
+  Button,
+  Badge,
+  Icon,
+  Header,
+  Divider,
+} from '@rneui/themed';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { EventReport } from '@jctop-event/shared-types';
 import { useReportStore } from '../../../stores/reportStore';
 import reportService, { EXPORT_FORMATS } from '../../../services/reportService';
 import { ReportVisualization } from './ReportVisualization';
 import { ReportExportControls } from './ReportExportControls';
+import { useAppTheme } from '@/theme';
 
 export const EventAnalyticsScreen: React.FC = () => {
-  const navigate = useNavigate();
-  const toast = useToast();
-  const { eventId } = useParams<{ eventId: string }>();
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { colors, spacing } = useAppTheme();
+  const eventId = (route.params as any)?.eventId;
   
   const {
     currentReport,
@@ -61,9 +40,7 @@ export const EventAnalyticsScreen: React.FC = () => {
     clearReport,
   } = useReportStore();
 
-  const bgColor = useColorModeValue('neutral.50', 'neutral.900');
-  const cardBgColor = useColorModeValue('white', 'neutral.800');
-  const borderColor = useColorModeValue('neutral.200', 'neutral.600');
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (eventId) {
@@ -87,46 +64,38 @@ export const EventAnalyticsScreen: React.FC = () => {
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || 'Failed to load event report';
       setReportError(errorMessage);
-      toast({
-        title: 'Error Loading Report',
-        description: errorMessage,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
     } finally {
       setReportLoading(false);
+      setRefreshing(false);
     }
   };
 
   const handleRefresh = () => {
+    setRefreshing(true);
     loadReport();
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'ended':
-        return 'success';
+        return colors.success;
       case 'published':
-        return 'primary';
+        return colors.primary;
       case 'draft':
-        return 'warning';
+        return colors.warning;
       case 'paused':
-        return 'warning';
+        return colors.warning;
       default:
-        return 'neutral';
+        return colors.grey3;
     }
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
+    return `NT$ ${amount.toLocaleString('zh-TW')}`;
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return new Date(dateString).toLocaleDateString('zh-TW', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -135,210 +104,260 @@ export const EventAnalyticsScreen: React.FC = () => {
     });
   };
 
-  if (reportLoading) {
+  if (reportLoading && !refreshing) {
     return (
-      <Box bg={bgColor} minH="100vh">
-        <Container maxW="7xl" py={8}>
-          <Center>
-            <VStack spacing={4}>
-              <Spinner size="xl" color="primary.500" />
-              <Text>Loading event report...</Text>
-            </VStack>
-          </Center>
-        </Container>
-      </Box>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.grey3 }]}>
+            Loading event report...
+          </Text>
+        </View>
+      </View>
     );
   }
 
   if (reportError) {
     return (
-      <Box bg={bgColor} minH="100vh">
-        <Container maxW="7xl" py={8}>
-          <VStack spacing={6}>
-            <HStack w="full" justify="space-between">
-              <Button
-                leftIcon={<ArrowBackIcon />}
-                variant="ghost"
-                onClick={() => navigate('/organizer/dashboard')}
-              >
-                Back to Dashboard
-              </Button>
-            </HStack>
-            
-            <Alert status="error">
-              <AlertIcon />
-              <VStack align="start" spacing={2}>
-                <Text fontWeight="bold">Failed to Load Report</Text>
-                <Text>{reportError}</Text>
-              </VStack>
-            </Alert>
-
-            <Button onClick={handleRefresh} leftIcon={<RepeatIcon />}>
-              Try Again
-            </Button>
-          </VStack>
-        </Container>
-      </Box>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.centerContent}>
+          <Icon
+            name="error-outline"
+            type="material"
+            color={colors.error}
+            size={48}
+          />
+          <Text style={[styles.errorText, { color: colors.error }]}>
+            {reportError}
+          </Text>
+          <Button
+            title="Retry"
+            onPress={handleRefresh}
+            buttonStyle={[styles.retryButton, { backgroundColor: colors.primary }]}
+          />
+        </View>
+      </View>
     );
   }
 
   if (!currentReport) {
     return (
-      <Box bg={bgColor} minH="100vh">
-        <Container maxW="7xl" py={8}>
-          <Center>
-            <Text>No report data available</Text>
-          </Center>
-        </Container>
-      </Box>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.centerContent}>
+          <Text style={[styles.noDataText, { color: colors.grey3 }]}>
+            No report data available
+          </Text>
+        </View>
+      </View>
     );
   }
 
   return (
-    <Box bg={bgColor} minH="100vh">
-      <Container maxW="7xl" py={8}>
-        <VStack spacing={6} align="stretch">
-          {/* Header */}
-          <HStack justify="space-between" wrap="wrap" spacing={4}>
-            <HStack spacing={4}>
-              <Button
-                leftIcon={<ArrowBackIcon />}
-                variant="ghost"
-                onClick={() => navigate('/organizer/dashboard')}
-              >
-                Back to Dashboard
-              </Button>
-              <VStack align="start" spacing={1}>
-                <Heading size="lg">{currentReport.eventDetails.title}</Heading>
-                <HStack>
-                  <Badge colorScheme={getStatusColor(currentReport.eventDetails.status)}>
-                    {currentReport.eventDetails.status.toUpperCase()}
-                  </Badge>
-                  <Text color="neutral.600" fontSize="sm">
-                    Report generated on {formatDate(currentReport.generatedAt)}
-                  </Text>
-                </HStack>
-              </VStack>
-            </HStack>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Header
+        leftComponent={
+          <Icon
+            name="arrow-back"
+            type="material"
+            color={colors.white}
+            onPress={() => navigation.goBack()}
+          />
+        }
+        centerComponent={{ text: 'Event Analytics', style: { color: colors.white } }}
+        rightComponent={
+          <Icon
+            name="refresh"
+            type="material"
+            color={colors.white}
+            onPress={handleRefresh}
+          />
+        }
+        backgroundColor={colors.primary}
+      />
 
-            <HStack spacing={2}>
-              <Tooltip label="Refresh Report">
-                <IconButton
-                  icon={<RepeatIcon />}
-                  aria-label="Refresh Report"
-                  variant="outline"
-                  onClick={handleRefresh}
-                  isLoading={reportLoading}
-                />
-              </Tooltip>
-              <ReportExportControls 
-                eventId={eventId!} 
-                eventTitle={currentReport.eventDetails.title}
-              />
-            </HStack>
-          </HStack>
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primary]}
+          />
+        }
+      >
+        {/* Event Info Card */}
+        <Card containerStyle={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text h4>{currentReport.eventDetails.title}</Text>
+            <Badge
+              value={currentReport.eventDetails.status}
+              badgeStyle={[
+                styles.badge,
+                { backgroundColor: getStatusColor(currentReport.eventDetails.status) }
+              ]}
+            />
+          </View>
+          <Divider style={styles.divider} />
+          <View style={styles.eventInfo}>
+            <View style={styles.infoRow}>
+              <Icon name="event" type="material" size={16} color={colors.grey3} />
+              <Text style={styles.infoText}>
+                {formatDate(currentReport.eventDetails.startDate instanceof Date ? currentReport.eventDetails.startDate.toISOString() : currentReport.eventDetails.startDate)}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Icon name="location-on" type="material" size={16} color={colors.grey3} />
+              <Text style={styles.infoText}>{currentReport.eventDetails.location}</Text>
+            </View>
+          </View>
+        </Card>
 
-          {/* Event Summary */}
-          <Card bg={cardBgColor} borderColor={borderColor}>
-            <CardHeader>
-              <Heading size="md" color="primary.600">Event Summary</Heading>
-            </CardHeader>
-            <CardBody>
-              <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={4}>
-                <VStack align="start" spacing={1}>
-                  <Text fontSize="sm" color="neutral.600">Location</Text>
-                  <Text fontWeight="medium">{currentReport.eventDetails.location}</Text>
-                </VStack>
-                <VStack align="start" spacing={1}>
-                  <Text fontSize="sm" color="neutral.600">Start Date</Text>
-                  <Text fontWeight="medium">
-                    {formatDate(currentReport.eventDetails.startDate.toString())}
-                  </Text>
-                </VStack>
-                <VStack align="start" spacing={1}>
-                  <Text fontSize="sm" color="neutral.600">End Date</Text>
-                  <Text fontWeight="medium">
-                    {formatDate(currentReport.eventDetails.endDate.toString())}
-                  </Text>
-                </VStack>
-                <VStack align="start" spacing={1}>
-                  <Text fontSize="sm" color="neutral.600">Duration</Text>
-                  <Text fontWeight="medium">
-                    {Math.ceil(
-                      (new Date(currentReport.eventDetails.endDate).getTime() - 
-                       new Date(currentReport.eventDetails.startDate).getTime()) / 
-                      (1000 * 60 * 60 * 24)
-                    )} days
-                  </Text>
-                </VStack>
-              </SimpleGrid>
-            </CardBody>
-          </Card>
+        {/* Summary Statistics */}
+        <Card containerStyle={styles.card}>
+          <Text h4 style={styles.cardTitle}>Summary</Text>
+          <Divider style={styles.divider} />
+          
+          <View style={styles.statsGrid}>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Total Revenue</Text>
+              <Text style={styles.statValue}>
+                {formatCurrency(currentReport.revenue.net)}
+              </Text>
+            </View>
+            
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Tickets Sold</Text>
+              <Text style={styles.statValue}>
+                {currentReport.registrationStats.total} / {(currentReport as any).totalCapacity || 0}
+              </Text>
+              <Text style={styles.statHelp}>
+                {Math.round((currentReport.registrationStats.total / ((currentReport as any).totalCapacity || 1)) * 100)}% sold
+              </Text>
+            </View>
+            
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Registrations</Text>
+              <Text style={styles.statValue}>{currentReport.registrationStats.total}</Text>
+            </View>
+            
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Check-ins</Text>
+              <Text style={styles.statValue}>
+                {currentReport.attendanceStats.checkedIn}
+              </Text>
+              <Text style={styles.statHelp}>
+                {Math.round(currentReport.attendanceStats.rate * 100)}% attendance
+              </Text>
+            </View>
+          </View>
+        </Card>
 
-          {/* Key Metrics */}
-          <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6}>
-            <Card bg={cardBgColor} borderColor={borderColor}>
-              <CardBody>
-                <Stat>
-                  <StatLabel>Total Registrations</StatLabel>
-                  <StatNumber color="primary.600">
-                    {currentReport.registrationStats.total}
-                  </StatNumber>
-                  <StatHelpText>
-                    Paid: {currentReport.registrationStats.byStatus.paid + 
-                            currentReport.registrationStats.byStatus.checkedIn}
-                  </StatHelpText>
-                </Stat>
-              </CardBody>
-            </Card>
+        {/* Report Visualization */}
+        <ReportVisualization report={currentReport} />
 
-            <Card bg={cardBgColor} borderColor={borderColor}>
-              <CardBody>
-                <Stat>
-                  <StatLabel>Gross Revenue</StatLabel>
-                  <StatNumber color="success.600">
-                    {formatCurrency(currentReport.revenue.gross)}
-                  </StatNumber>
-                  <StatHelpText>
-                    Net: {formatCurrency(currentReport.revenue.net)}
-                  </StatHelpText>
-                </Stat>
-              </CardBody>
-            </Card>
-
-            <Card bg={cardBgColor} borderColor={borderColor}>
-              <CardBody>
-                <Stat>
-                  <StatLabel>Attendance Rate</StatLabel>
-                  <StatNumber color="primary.600">
-                    {currentReport.attendanceStats.rate}%
-                  </StatNumber>
-                  <StatHelpText>
-                    {currentReport.attendanceStats.checkedIn} of {currentReport.attendanceStats.registered} checked in
-                  </StatHelpText>
-                </Stat>
-              </CardBody>
-            </Card>
-
-            <Card bg={cardBgColor} borderColor={borderColor}>
-              <CardBody>
-                <Stat>
-                  <StatLabel>Discounts Applied</StatLabel>
-                  <StatNumber color="warning.600">
-                    {formatCurrency(currentReport.revenue.discountAmount)}
-                  </StatNumber>
-                  <StatHelpText>
-                    Total savings for attendees
-                  </StatHelpText>
-                </Stat>
-              </CardBody>
-            </Card>
-          </SimpleGrid>
-
-          {/* Visualizations */}
-          <ReportVisualization report={currentReport} />
-        </VStack>
-      </Container>
-    </Box>
+        {/* Export Controls */}
+        <ReportExportControls
+          eventId={eventId}
+          eventTitle={currentReport.eventDetails.title}
+        />
+        
+        <View style={{ height: spacing.xl }} />
+      </ScrollView>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+  },
+  errorText: {
+    marginTop: 10,
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  noDataText: {
+    fontSize: 16,
+  },
+  retryButton: {
+    marginTop: 20,
+    paddingHorizontal: 30,
+  },
+  card: {
+    marginHorizontal: 15,
+    marginVertical: 10,
+    borderRadius: 8,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  cardTitle: {
+    marginBottom: 10,
+  },
+  badge: {
+    borderRadius: 4,
+    paddingHorizontal: 8,
+  },
+  divider: {
+    marginVertical: 10,
+  },
+  eventInfo: {
+    marginTop: 10,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  infoText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#666',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  statCard: {
+    width: '48%',
+    padding: 15,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 5,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  statHelp: {
+    fontSize: 11,
+    color: '#999',
+    marginTop: 2,
+  },
+});
+
+export default EventAnalyticsScreen;

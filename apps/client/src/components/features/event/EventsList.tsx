@@ -1,23 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Grid,
-  Heading,
-  Text,
-  Alert,
-  AlertIcon,
-  AlertTitle,
-  AlertDescription,
-  Button,
-  VStack,
-  useColorModeValue,
-  Skeleton,
-  Container,
-} from '@chakra-ui/react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, ScrollView, RefreshControl, FlatList } from 'react-native';
+import { Text, Button, Icon, SearchBar, ButtonGroup } from '@rneui/themed';
+import { useTranslation } from 'react-i18next';
 import EventCard from './EventCard';
-import Pagination from '../../ui/Pagination';
+import EmptyState from '../../shared/EmptyState';
 import eventService from '../../../services/eventService';
 import { EventWithRelations, PaginatedEventsResponse } from '@jctop-event/shared-types';
+import { useAppTheme } from '@/theme';
+import { useDebounce } from '../../../hooks/useDebounce';
+import { useResponsive } from '../../../hooks/useResponsive';
+import ResponsiveGrid from '../../shared/ResponsiveGrid';
 
 interface EventsListProps {
   onEventClick?: (eventId: string) => void;
@@ -32,68 +24,134 @@ const EventsList: React.FC<EventsListProps> = ({
   onEventClick,
   onFavorite,
   favoritedEvents = new Set(),
-  title = 'Discover Events',
+  title,
   showTitle = true,
   itemsPerPage = 12,
 }) => {
+  const { t } = useTranslation();
+  const { colors, spacing } = useAppTheme();
+  const responsive = useResponsive();
+
   // State management
   const [events, setEvents] = useState<EventWithRelations[]>([]);
+  const [allEvents, setAllEvents] = useState<EventWithRelations[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentLimit, setCurrentLimit] = useState(itemsPerPage);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(0);
 
-  // Design system colors
-  const bgColor = useColorModeValue('#F8FAFC', '#0F172A');
-  const textColor = useColorModeValue('#0F172A', '#F8FAFC');
-  const mutedTextColor = useColorModeValue('#64748B', '#94A3B8');
+  // Debounce search query
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+
+  // Categories
+  const categories = [
+    t('events.allCategories'),
+    t('events.music'),
+    t('events.sports'),
+    t('events.education'),
+    t('events.business'),
+    t('events.arts'),
+    t('events.food'),
+    t('events.technology'),
+  ];
+
+  // Calculate number of columns based on screen width
+  const numColumns = useMemo(() => {
+    if (responsive.isDesktop) return 3;
+    if (responsive.isTablet) return 2;
+    return 1;
+  }, [responsive.isDesktop, responsive.isTablet]);
 
   // Fetch events function
-  const fetchEvents = async (page: number, limit: number) => {
+  const fetchEvents = async (page: number = 1, limit: number = itemsPerPage, isRefresh: boolean = false) => {
     try {
-      setIsLoading(true);
+      if (isRefresh) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
       setError(null);
       
       const response: PaginatedEventsResponse = await eventService.getPublicEvents(page, limit);
       
-      setEvents(response.data);
+      setAllEvents(response.data);
       setCurrentPage(response.pagination.page);
       setTotalPages(response.pagination.totalPages);
       setTotalItems(response.pagination.total);
-      setCurrentLimit(response.pagination.limit);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load events';
+      const errorMessage = err instanceof Error ? err.message : t('errors.networkError');
       setError(errorMessage);
-      setEvents([]);
+      setAllEvents([]);
       setTotalPages(0);
       setTotalItems(0);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
+  // Filter events based on search and category
+  const filteredEvents = useMemo(() => {
+    let filtered = allEvents;
+
+    // Filter by search query
+    if (debouncedSearchQuery.trim()) {
+      const query = debouncedSearchQuery.toLowerCase().trim();
+      filtered = filtered.filter(event => {
+        const searchableText = [
+          event.title,
+          event.description,
+          event.location,
+          event.venue?.name,
+          event.category?.name
+        ].filter(Boolean).join(' ').toLowerCase();
+        
+        return searchableText.includes(query);
+      });
+    }
+
+    // Filter by category
+    if (selectedCategoryIndex > 0) {
+      const categoryMap: { [key: string]: string } = {
+        [t('events.music')]: 'music',
+        [t('events.sports')]: 'sports', 
+        [t('events.education')]: 'education',
+        [t('events.business')]: 'business',
+        [t('events.arts')]: 'arts',
+        [t('events.food')]: 'food',
+        [t('events.technology')]: 'technology',
+      };
+      
+      const selectedCategory = categories[selectedCategoryIndex];
+      const categoryKey = categoryMap[selectedCategory];
+      
+      if (categoryKey) {
+        filtered = filtered.filter(event =>
+          event.category?.name?.toLowerCase() === categoryKey
+        );
+      }
+    }
+
+    return filtered;
+  }, [allEvents, debouncedSearchQuery, selectedCategoryIndex, categories, t]);
+
   // Initial load
   useEffect(() => {
-    fetchEvents(1, itemsPerPage);
-  }, [itemsPerPage]);
+    fetchEvents();
+  }, []);
 
-  // Handle page change
-  const handlePageChange = (page: number) => {
-    fetchEvents(page, currentLimit);
-    // Scroll to top of the list on page change
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  // Handle items per page change
-  const handleItemsPerPageChange = (newLimit: number) => {
-    fetchEvents(1, newLimit); // Reset to page 1 when changing page size
+  // Handle refresh
+  const handleRefresh = () => {
+    fetchEvents(1, itemsPerPage, true);
   };
 
   // Handle retry
   const handleRetry = () => {
-    fetchEvents(currentPage, currentLimit);
+    fetchEvents();
   };
 
   // Handle event click
@@ -110,135 +168,219 @@ const EventsList: React.FC<EventsListProps> = ({
     }
   };
 
-  // Loading skeleton
-  const renderLoadingSkeleton = () => (
-    <Grid
-      templateColumns={{
-        base: '1fr',
-        md: 'repeat(2, 1fr)',
-        lg: 'repeat(3, 1fr)',
-        xl: 'repeat(4, 1fr)',
-      }}
-      gap={6}
-    >
-      {Array.from({ length: currentLimit }).map((_, index) => (
-        <EventCard
-          key={`skeleton-${index}`}
-          event={{} as EventWithRelations}
-          isLoading={true}
-        />
-      ))}
-    </Grid>
-  );
+  // Handle search
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
+  };
 
-  // Empty state
+  // Handle category change
+  const handleCategoryPress = (selectedIndex: number) => {
+    setSelectedCategoryIndex(selectedIndex);
+  };
+
+  // Render empty state
   const renderEmptyState = () => (
-    <VStack spacing={6} py={12} textAlign="center">
-      <Box fontSize="6xl">🎟️</Box>
-      <VStack spacing={2}>
-        <Heading as="h3" size="lg" color={textColor}>
-          No Events Found
-        </Heading>
-        <Text color={mutedTextColor} maxW="400px">
-          There are no published events available at the moment. Please check back later for upcoming events.
-        </Text>
-      </VStack>
-      <Button colorScheme="primary" onClick={handleRetry}>
-        Refresh Events
-      </Button>
-    </VStack>
+    <EmptyState
+      title={searchQuery ? t('events.noEventsMatchSearch') : t('events.noEvents')}
+      description={searchQuery ? t('events.tryDifferentSearch') : t('events.checkBackLater')}
+      icon="calendar"
+      iconType="material-community"
+      actionLabel={t('common.retry')}
+      onAction={handleRetry}
+    />
   );
 
-  // Error state
+  // Render error state
   const renderErrorState = () => (
-    <Alert status="error" borderRadius="md" flexDirection="column" textAlign="center" py={8}>
-      <AlertIcon boxSize="40px" mr={0} />
-      <AlertTitle mt={4} mb={1} fontSize="lg">
-        Failed to Load Events
-      </AlertTitle>
-      <AlertDescription maxWidth="400px" mb={4}>
-        {error || 'An unexpected error occurred while loading events. Please try again.'}
-      </AlertDescription>
-      <Button colorScheme="red" size="sm" onClick={handleRetry}>
-        Try Again
-      </Button>
-    </Alert>
+    <View style={{ 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      paddingVertical: spacing.xxxl,
+      paddingHorizontal: spacing.lg 
+    }}>
+      <Icon
+        name="alert-circle"
+        type="material-community"
+        size={60}
+        color={colors.danger}
+        containerStyle={{ marginBottom: spacing.lg }}
+      />
+      <Text h3 style={{ 
+        color: colors.dark, 
+        textAlign: 'center', 
+        marginBottom: spacing.sm 
+      }}>
+        {t('errors.somethingWentWrong')}
+      </Text>
+      <Text style={{ 
+        color: colors.midGrey, 
+        textAlign: 'center', 
+        marginBottom: spacing.lg,
+        lineHeight: 20 
+      }}>
+        {error || t('errors.networkError')}
+      </Text>
+      <Button
+        title={t('errors.retry')}
+        onPress={handleRetry}
+        buttonStyle={{
+          backgroundColor: colors.danger,
+          borderRadius: 8,
+          paddingVertical: spacing.sm,
+          paddingHorizontal: spacing.lg,
+        }}
+        titleStyle={{ fontSize: 16, fontWeight: '600' }}
+      />
+    </View>
   );
 
   return (
-    <Container maxW="1200px" px={{ base: 4, md: 6 }}>
-      <VStack spacing={8} align="stretch">
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={{ flexGrow: 1 }}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={handleRefresh}
+          colors={[colors.primary]}
+          tintColor={colors.primary}
+        />
+      }
+      testID="events-list-scroll"
+    >
+      <View style={{ padding: spacing.md }}>
         {/* Header */}
         {showTitle && (
-          <Box textAlign="center" py={{ base: 6, md: 8 }}>
-            <Heading
-              as="h1"
-              size="2xl"
-              color={textColor}
-              mb={4}
-              fontWeight="700"
-            >
-              {title}
-            </Heading>
-            <Text
-              fontSize="lg"
-              color={mutedTextColor}
-              maxW="600px"
-              mx="auto"
-              lineHeight="1.6"
-            >
-              Find and discover amazing events happening around you. From concerts to conferences, there's something for everyone.
+          <View style={{ alignItems: 'center', marginBottom: spacing.lg }}>
+            <Text h1 style={{ 
+              color: colors.dark,
+              textAlign: 'center',
+              marginBottom: spacing.sm 
+            }}>
+              {title || t('events.discoverEvents')}
             </Text>
-          </Box>
+            <Text style={{ 
+              color: colors.midGrey,
+              textAlign: 'center',
+              fontSize: 16,
+              lineHeight: 24,
+              maxWidth: 400 
+            }}>
+              {t('events.noEventsDescription')}
+            </Text>
+          </View>
         )}
 
+        {/* Search Bar */}
+        <SearchBar
+          placeholder={t('events.searchEvents')}
+          onChangeText={handleSearchChange}
+          value={searchQuery}
+          containerStyle={{
+            backgroundColor: 'transparent',
+            borderTopWidth: 0,
+            borderBottomWidth: 0,
+            paddingHorizontal: 0,
+            marginBottom: spacing.md,
+          }}
+          inputContainerStyle={{
+            backgroundColor: colors.lightGrey,
+            borderRadius: 8,
+          }}
+          inputStyle={{
+            fontSize: 16,
+            color: colors.text,
+          }}
+          placeholderTextColor={colors.midGrey}
+          searchIcon={{
+            name: 'magnify',
+            type: 'material-community',
+            color: colors.midGrey,
+          }}
+          clearIcon={{
+            name: 'close',
+            type: 'material-community',
+            color: colors.midGrey,
+          }}
+          testID="events-search-bar"
+        />
+
+        {/* Category Filters */}
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={{ marginBottom: spacing.lg }}
+          contentContainerStyle={{ paddingHorizontal: spacing.xs }}
+        >
+          <ButtonGroup
+            buttons={categories}
+            selectedIndex={selectedCategoryIndex}
+            onPress={handleCategoryPress}
+            containerStyle={{
+              marginLeft: 0,
+              marginRight: 0,
+              borderRadius: 8,
+            }}
+            buttonStyle={{
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.sm,
+            }}
+            selectedButtonStyle={{
+              backgroundColor: colors.primary,
+            }}
+            textStyle={{
+              color: colors.midGrey,
+              fontSize: 14,
+            }}
+            selectedTextStyle={{
+              color: colors.white,
+              fontWeight: '600',
+            }}
+          />
+        </ScrollView>
+
         {/* Content */}
-        <Box minH="400px">
+        <View style={{ minHeight: 400 }}>
           {error ? (
             renderErrorState()
           ) : isLoading ? (
-            renderLoadingSkeleton()
-          ) : events.length === 0 ? (
+            <FlatList
+              data={Array.from({ length: 6 })}
+              renderItem={() => (
+                <EventCard
+                  event={{} as EventWithRelations}
+                  isLoading={true}
+                />
+              )}
+              keyExtractor={(_, index) => `skeleton-${index}`}
+              numColumns={numColumns}
+              key={numColumns} // Force re-render when columns change
+              scrollEnabled={false}
+            />
+          ) : filteredEvents.length === 0 ? (
             renderEmptyState()
           ) : (
-            <Grid
-              templateColumns={{
-                base: '1fr',
-                md: 'repeat(2, 1fr)',
-                lg: 'repeat(3, 1fr)',
-                xl: 'repeat(4, 1fr)',
-              }}
-              gap={6}
-            >
-              {events.map((event) => (
+            <FlatList
+              data={filteredEvents}
+              renderItem={({ item }) => (
                 <EventCard
-                  key={event.id}
-                  event={event}
+                  key={item.id}
+                  event={item}
                   onEventClick={handleEventClick}
                   onFavorite={onFavorite ? handleFavoriteToggle : undefined}
-                  isFavorited={favoritedEvents.has(event.id)}
+                  isFavorited={favoritedEvents.has(item.id)}
                 />
-              ))}
-            </Grid>
+              )}
+              keyExtractor={(item) => item.id}
+              numColumns={numColumns}
+              key={numColumns} // Force re-render when columns change
+              scrollEnabled={false}
+              testID="events-list-flatlist"
+            />
           )}
-        </Box>
-
-        {/* Pagination */}
-        {!error && !isLoading && events.length > 0 && totalPages > 1 && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={totalItems}
-            itemsPerPage={currentLimit}
-            onPageChange={handlePageChange}
-            onItemsPerPageChange={handleItemsPerPageChange}
-            isLoading={isLoading}
-            showPageSizeSelector={true}
-            pageSizeOptions={[12, 24, 48]}
-          />
-        )}
-      </VStack>
-    </Container>
+        </View>
+      </View>
+    </ScrollView>
   );
 };
 

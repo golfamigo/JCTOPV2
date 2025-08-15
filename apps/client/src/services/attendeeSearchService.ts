@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import apiClient from './apiClient';
 import { AttendeeSearchResult } from '../components/features/organizer/AttendeeSearchResults';
 
 export interface AttendeeSearchParams {
@@ -76,7 +76,7 @@ class AttendeeSearchService {
         ...(params.offset && { offset: params.offset.toString() }),
       });
 
-      const response = await apiClient.get(`/api/v1/events/${eventId}/attendees/search?${queryParams}`);
+      const response = await apiClient.get(`/api/v1/events/${eventId}/attendees/search?${queryParams}`) as any;
       
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
@@ -136,7 +136,7 @@ class AttendeeSearchService {
       const response = await apiClient.post(`/api/v1/events/${eventId}/checkin`, {
         registrationId,
         manual: true,
-      });
+      }) as any;
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));

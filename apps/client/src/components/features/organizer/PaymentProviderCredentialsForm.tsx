@@ -1,45 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  VStack,
-  HStack,
   Button,
   Text,
-  Heading,
-  FormControl,
-  FormLabel,
-  FormErrorMessage,
-  FormHelperText,
   Input,
-  Select,
   Switch,
-  Alert,
-  AlertIcon,
-  AlertDescription,
-  useColorModeValue,
   Card,
-  CardBody,
-  CardHeader,
-  useToast,
-  Divider,
   Badge,
   Icon,
-  Tabs,
-  TabList,
-  TabPanels,
+  Divider,
   Tab,
-  TabPanel,
-  Textarea,
-  Code,
-} from '@chakra-ui/react';
-import { CheckIcon, InfoIcon, WarningIcon } from '@chakra-ui/icons';
-import { FaCreditCard } from 'react-icons/fa';
+  TabView
+} from '@rneui/themed';
+import { View, ScrollView, Alert, StyleSheet, Platform } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { PaymentProvider, PaymentProviderDto, UpdatePaymentProviderDto } from '@jctop-event/shared-types';
 import paymentService from '../../../services/paymentService';
 
 interface PaymentProviderCredentialsFormProps {
-  provider?: PaymentProvider; // If editing existing provider
-  providerId: string; // 'ecpay', 'stripe', etc.
+  provider?: PaymentProvider;
+  providerId: string;
   onSave: (provider: PaymentProvider) => void;
   onCancel: () => void;
   isLoading?: boolean;
@@ -49,9 +28,18 @@ interface ECPayCredentials {
   merchantId: string;
   hashKey: string;
   hashIV: string;
-  environment: 'development' | 'production';
+  useSandbox: boolean;
   returnUrl?: string;
 }
+
+interface StripeCredentials {
+  publishableKey: string;
+  secretKey: string;
+  webhookSecret?: string;
+  useSandbox: boolean;
+}
+
+type ProviderCredentials = ECPayCredentials | StripeCredentials;
 
 const PaymentProviderCredentialsForm: React.FC<PaymentProviderCredentialsFormProps> = ({
   provider,
@@ -60,425 +48,459 @@ const PaymentProviderCredentialsForm: React.FC<PaymentProviderCredentialsFormPro
   onCancel,
   isLoading = false,
 }) => {
-  const [credentials, setCredentials] = useState<ECPayCredentials>({
-    merchantId: '',
-    hashKey: '',
-    hashIV: '',
-    environment: 'development',
-    returnUrl: '',
+  const [credentials, setCredentials] = useState<ProviderCredentials>(() => {
+    const initial = provider?.credentials || (providerId === 'ecpay' ? {
+      merchantId: '',
+      hashKey: '',
+      hashIV: '',
+      useSandbox: true,
+      returnUrl: ''
+    } : {
+      publishableKey: '',
+      secretKey: '',
+      webhookSecret: '',
+      useSandbox: true
+    });
+    return typeof initial === 'string' ? {} as ProviderCredentials : initial;
   });
-  
-  const [isActive, setIsActive] = useState(true);
-  const [isDefault, setIsDefault] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+
+  const [isActive, setIsActive] = useState(provider?.isActive || false);
+  const [isDefault, setIsDefault] = useState(provider?.isDefault || false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSaving, setIsSaving] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [activeTab, setActiveTab] = useState(0);
 
-  const toast = useToast();
-  const bgColor = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.600');
-
-  useEffect(() => {
-    if (provider) {
-      // If editing existing provider, we can't show credentials (they're encrypted)
-      // But we can show other settings
-      setIsActive(provider.isActive);
-      setIsDefault(provider.isDefault);
-    }
-  }, [provider]);
-
-  const validateCredentials = (): boolean => {
+  const validateECPayCredentials = (creds: ECPayCredentials): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!credentials.merchantId) {
-      newErrors.merchantId = '商店代號為必填項目';
-    } else if (!/^\d+$/.test(credentials.merchantId)) {
-      newErrors.merchantId = '商店代號必須為數字';
+    if (!creds.merchantId) {
+      newErrors.merchantId = '請輸入商店代號';
+    } else if (creds.merchantId.length < 7) {
+      newErrors.merchantId = '商店代號格式不正確';
     }
 
-    if (!credentials.hashKey) {
-      newErrors.hashKey = 'HashKey 為必填項目';
-    } else if (!/^[A-Za-z0-9]+$/.test(credentials.hashKey)) {
-      newErrors.hashKey = 'HashKey 只能包含英數字';
+    if (!creds.hashKey) {
+      newErrors.hashKey = '請輸入 HashKey';
     }
 
-    if (!credentials.hashIV) {
-      newErrors.hashIV = 'HashIV 為必填項目';
-    } else if (!/^[A-Za-z0-9]+$/.test(credentials.hashIV)) {
-      newErrors.hashIV = 'HashIV 只能包含英數字';
+    if (!creds.hashIV) {
+      newErrors.hashIV = '請輸入 HashIV';
     }
 
-    if (credentials.returnUrl && !isValidUrl(credentials.returnUrl)) {
-      newErrors.returnUrl = '請輸入有效的 URL';
+    if (creds.returnUrl && !creds.returnUrl.startsWith('https://')) {
+      newErrors.returnUrl = '回傳網址必須使用 HTTPS';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const isValidUrl = (url: string): boolean => {
-    try {
-      new URL(url);
-      return true;
-    } catch {
-      return false;
-    }
-  };
+  const validateStripeCredentials = (creds: StripeCredentials): boolean => {
+    const newErrors: Record<string, string> = {};
 
-  const handleTestCredentials = async () => {
-    if (!validateCredentials()) {
-      setTestResult({
-        success: false,
-        message: '請先修正表單錯誤'
-      });
-      return;
+    if (!creds.publishableKey) {
+      newErrors.publishableKey = '請輸入 Publishable Key';
+    } else if (!creds.publishableKey.startsWith('pk_')) {
+      newErrors.publishableKey = 'Publishable Key 格式不正確';
     }
 
-    setTestResult(null);
-    
-    try {
-      const validation = paymentService.validateECPayCredentials(credentials);
-      
-      if (validation.valid) {
-        setTestResult({
-          success: true,
-          message: '憑證格式驗證通過！實際連線測試需要儲存後進行。'
-        });
-      } else {
-        setTestResult({
-          success: false,
-          message: validation.message || '憑證驗證失敗'
-        });
-      }
-    } catch (error: any) {
-      setTestResult({
-        success: false,
-        message: error.message || '憑證測試失敗'
-      });
+    if (!creds.secretKey) {
+      newErrors.secretKey = '請輸入 Secret Key';
+    } else if (!creds.secretKey.startsWith('sk_')) {
+      newErrors.secretKey = 'Secret Key 格式不正確';
     }
+
+    if (creds.webhookSecret && !creds.webhookSecret.startsWith('whsec_')) {
+      newErrors.webhookSecret = 'Webhook Secret 格式不正確';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSave = async () => {
-    if (!validateCredentials()) {
-      toast({
-        title: '表單驗證失敗',
-        description: '請修正表單中的錯誤',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+    let isValid = false;
+    
+    if (providerId === 'ecpay') {
+      isValid = validateECPayCredentials(credentials as ECPayCredentials);
+    } else if (providerId === 'stripe') {
+      isValid = validateStripeCredentials(credentials as StripeCredentials);
+    }
+
+    if (!isValid) {
+      Alert.alert('驗證失敗', '請修正錯誤後再試');
       return;
     }
 
-    setIsSaving(true);
-
     try {
-      let savedProvider: PaymentProvider;
+      setIsSaving(true);
 
+      const providerData: PaymentProviderDto = {
+        type: providerId as 'ecpay' | 'stripe',
+        name: providerId === 'ecpay' ? 'ECPay' : 'Stripe',
+        providerId,
+        providerName: providerId === 'ecpay' ? 'ECPay 綠界科技' : 'Stripe',
+        credentials,
+        isActive,
+        isDefault,
+      };
+
+      let savedProvider: PaymentProvider;
+      
       if (provider) {
-        // Update existing provider
         const updateData: UpdatePaymentProviderDto = {
           credentials,
           isActive,
           isDefault,
         };
-        savedProvider = await paymentService.updatePaymentProvider(provider.providerId, updateData);
+        savedProvider = await paymentService.updatePaymentProvider(provider.id, updateData);
       } else {
-        // Create new provider
-        const providerData: PaymentProviderDto = {
-          providerId,
-          providerName: getProviderName(providerId),
-          credentials,
-          isActive,
-          isDefault,
-        };
-        savedProvider = await paymentService.addPaymentProvider(providerData);
+        savedProvider = await paymentService.createPaymentProvider(providerData);
       }
 
-      toast({
-        title: provider ? '設定已更新' : '付款方式已新增',
-        description: `${getProviderName(providerId)} 設定已成功儲存`,
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
-      });
-
+      Alert.alert('成功', '付款設定已儲存');
       onSave(savedProvider);
     } catch (error: any) {
-      console.error('Error saving payment provider:', error);
-      toast({
-        title: '儲存失敗',
-        description: error.message || '無法儲存付款方式設定',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      Alert.alert('儲存失敗', error.message || '無法儲存付款設定');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const getProviderName = (id: string): string => {
-    switch (id) {
-      case 'ecpay':
-        return 'ECPay 綠界科技';
-      case 'stripe':
-        return 'Stripe';
-      case 'paypal':
-        return 'PayPal';
-      default:
-        return id;
+  const handleTestCredentials = async () => {
+    try {
+      const result = await paymentService.testCredentials(providerId, credentials);
+      setTestResult({
+        success: result.success,
+        message: result.success ? '憑證驗證成功' : result.message || '憑證驗證失敗'
+      });
+    } catch (error: any) {
+      setTestResult({
+        success: false,
+        message: error.message || '測試失敗'
+      });
     }
   };
 
   const renderECPayForm = () => (
-    <VStack spacing={6}>
-      {/* Basic Credentials */}
-      <VStack spacing={4} w="full">
-        <FormControl isInvalid={!!errors.merchantId}>
-          <FormLabel>商店代號 (MerchantID)</FormLabel>
+    <View style={styles.container}>
+      <View style={styles.section}>
+        <View style={styles.formControl}>
+          <Text style={styles.label}>商店代號 (MerchantID)</Text>
           <Input
-            value={credentials.merchantId}
-            onChange={(e) => setCredentials({ ...credentials, merchantId: e.target.value })}
+            value={(credentials as ECPayCredentials).merchantId}
+            onChangeText={(text) => setCredentials({ ...credentials, merchantId: text })}
             placeholder="例如：2000132"
             maxLength={10}
           />
-          <FormErrorMessage>{errors.merchantId}</FormErrorMessage>
-          <FormHelperText>ECPay 提供的商店代號，通常為 7 位數字</FormHelperText>
-        </FormControl>
+          {errors.merchantId ? <Text style={styles.errorText}>{errors.merchantId}</Text> : null}
+          <Text style={styles.helperText}>ECPay 提供的商店代號，通常為 7 位數字</Text>
+        </View>
 
-        <FormControl isInvalid={!!errors.hashKey}>
-          <FormLabel>HashKey</FormLabel>
+        <View style={styles.formControl}>
+          <Text style={styles.label}>HashKey</Text>
           <Input
-            type="password"
-            value={credentials.hashKey}
-            onChange={(e) => setCredentials({ ...credentials, hashKey: e.target.value })}
-            placeholder="請輸入 ECPay HashKey"
-            maxLength={50}
+            value={(credentials as ECPayCredentials).hashKey}
+            onChangeText={(text) => setCredentials({ ...credentials, hashKey: text })}
+            placeholder="請輸入 HashKey"
+            secureTextEntry
           />
-          <FormErrorMessage>{errors.hashKey}</FormErrorMessage>
-          <FormHelperText>ECPay 提供的 HashKey，用於加密驗證</FormHelperText>
-        </FormControl>
+          {errors.hashKey ? <Text style={styles.errorText}>{errors.hashKey}</Text> : null}
+          <Text style={styles.helperText}>用於加密驗證的金鑰</Text>
+        </View>
 
-        <FormControl isInvalid={!!errors.hashIV}>
-          <FormLabel>HashIV</FormLabel>
+        <View style={styles.formControl}>
+          <Text style={styles.label}>HashIV</Text>
           <Input
-            type="password"
-            value={credentials.hashIV}
-            onChange={(e) => setCredentials({ ...credentials, hashIV: e.target.value })}
-            placeholder="請輸入 ECPay HashIV"
-            maxLength={50}
+            value={(credentials as ECPayCredentials).hashIV}
+            onChangeText={(text) => setCredentials({ ...credentials, hashIV: text })}
+            placeholder="請輸入 HashIV"
+            secureTextEntry
           />
-          <FormErrorMessage>{errors.hashIV}</FormErrorMessage>
-          <FormHelperText>ECPay 提供的 HashIV，用於加密驗證</FormHelperText>
-        </FormControl>
+          {errors.hashIV ? <Text style={styles.errorText}>{errors.hashIV}</Text> : null}
+          <Text style={styles.helperText}>用於加密驗證的向量值</Text>
+        </View>
 
-        <FormControl>
-          <FormLabel>環境設定</FormLabel>
-          <Select
-            value={credentials.environment}
-            onChange={(e) => setCredentials({ 
-              ...credentials, 
-              environment: e.target.value as 'development' | 'production' 
-            })}
-          >
-            <option value="development">測試環境 (Staging)</option>
-            <option value="production">正式環境 (Production)</option>
-          </Select>
-          <FormHelperText>
-            {credentials.environment === 'development' 
-              ? '使用 ECPay 測試環境，適合開發和測試' 
-              : '使用 ECPay 正式環境，實際收款'}
-          </FormHelperText>
-        </FormControl>
+        <View style={styles.formControl}>
+          <View style={styles.switchRow}>
+            <View style={styles.switchLabel}>
+              <Text style={styles.label}>測試模式</Text>
+              <Text style={styles.helperText}>
+                {(credentials as ECPayCredentials).useSandbox 
+                  ? '使用 ECPay 測試環境，不會實際收款'
+                  : '使用 ECPay 正式環境，實際收款'}
+              </Text>
+            </View>
+            <Switch
+              value={(credentials as ECPayCredentials).useSandbox}
+              onValueChange={(value) => setCredentials({ ...credentials, useSandbox: value })}
+            />
+          </View>
+        </View>
 
-        <FormControl isInvalid={!!errors.returnUrl}>
-          <FormLabel>自訂回傳網址 (選填)</FormLabel>
+        <View style={styles.formControl}>
+          <Text style={styles.label}>自訂回傳網址 (選填)</Text>
           <Input
-            value={credentials.returnUrl}
-            onChange={(e) => setCredentials({ ...credentials, returnUrl: e.target.value })}
+            value={(credentials as ECPayCredentials).returnUrl}
+            onChangeText={(text) => setCredentials({ ...credentials, returnUrl: text })}
             placeholder="https://your-domain.com/payment/callback"
           />
-          <FormErrorMessage>{errors.returnUrl}</FormErrorMessage>
-          <FormHelperText>自訂付款完成後的回傳網址，留空使用系統預設</FormHelperText>
-        </FormControl>
-      </VStack>
+          {errors.returnUrl ? <Text style={styles.errorText}>{errors.returnUrl}</Text> : null}
+          <Text style={styles.helperText}>自訂付款完成後的回傳網址，留空使用系統預設</Text>
+        </View>
+      </View>
 
-      {/* Test Credentials */}
-      <Box w="full" p={4} bg="blue.50" borderRadius="md" borderLeft="4px solid" borderLeftColor="blue.400">
-        <VStack spacing={3} align="start">
-          <HStack>
-            <Icon as={InfoIcon} color="blue.500" />
-            <Text fontWeight="medium" color="blue.700">憑證測試</Text>
-          </HStack>
-          <Text fontSize="sm" color="blue.600">
+      <View style={styles.testCredentialsBox}>
+        <View style={styles.testCredentialsContent}>
+          <View style={styles.testCredentialsHeader}>
+            <Icon name="info" type="material" color="#3182ce" size={20} />
+            <Text style={styles.testCredentialsTitle}>憑證測試</Text>
+          </View>
+          <Text style={styles.testCredentialsDescription}>
             在儲存前，建議先測試憑證格式是否正確
           </Text>
           <Button
-            size="sm"
-            colorScheme="blue"
-            variant="outline"
-            onClick={handleTestCredentials}
-          >
-            測試憑證
-          </Button>
+            title="測試憑證"
+            type="outline"
+            onPress={handleTestCredentials}
+          />
           
           {testResult && (
-            <Alert status={testResult.success ? 'success' : 'error'} size="sm">
-              <AlertIcon />
-              <AlertDescription fontSize="sm">{testResult.message}</AlertDescription>
-            </Alert>
+            <View style={[styles.alert, testResult.success ? styles.alertSuccess : styles.alertError]}>
+              <Icon 
+                name={testResult.success ? 'check-circle' : 'error'} 
+                type="material" 
+                color={testResult.success ? '#48bb78' : '#f56565'} 
+                size={16} 
+              />
+              <Text style={styles.alertText}>{testResult.message}</Text>
+            </View>
           )}
-        </VStack>
-      </Box>
-    </VStack>
+        </View>
+      </View>
+    </View>
   );
 
-  const renderConfigurationHelp = () => (
-    <VStack spacing={4} align="start">
-      <Heading as="h4" size="sm">如何取得 ECPay 憑證？</Heading>
-      
-      <Box>
-        <Text fontWeight="medium" mb={2}>1. 登入 ECPay 管理後台</Text>
-        <Text fontSize="sm" color="gray.600" mb={3}>
-          前往 ECPay 特店管理後台，使用您的帳號密碼登入
-        </Text>
-      </Box>
+  const renderStripeForm = () => (
+    <View style={styles.container}>
+      <View style={styles.section}>
+        <View style={styles.formControl}>
+          <Text style={styles.label}>Publishable Key</Text>
+          <Input
+            value={(credentials as StripeCredentials).publishableKey}
+            onChangeText={(text) => setCredentials({ ...credentials, publishableKey: text })}
+            placeholder="pk_test_..."
+          />
+          {errors.publishableKey ? <Text style={styles.errorText}>{errors.publishableKey}</Text> : null}
+          <Text style={styles.helperText}>用於前端的公開金鑰</Text>
+        </View>
 
-      <Box>
-        <Text fontWeight="medium" mb={2}>2. 查看商店資訊</Text>
-        <Text fontSize="sm" color="gray.600" mb={3}>
-          在「系統開發管理」→「系統介接設定」中可以找到：
-        </Text>
-        <VStack spacing={1} align="start" pl={4}>
-          <Text fontSize="sm">• 商店代號 (MerchantID)</Text>
-          <Text fontSize="sm">• HashKey</Text>
-          <Text fontSize="sm">• HashIV</Text>
-        </VStack>
-      </Box>
+        <View style={styles.formControl}>
+          <Text style={styles.label}>Secret Key</Text>
+          <Input
+            value={(credentials as StripeCredentials).secretKey}
+            onChangeText={(text) => setCredentials({ ...credentials, secretKey: text })}
+            placeholder="sk_test_..."
+            secureTextEntry
+          />
+          {errors.secretKey ? <Text style={styles.errorText}>{errors.secretKey}</Text> : null}
+          <Text style={styles.helperText}>用於後端的私密金鑰</Text>
+        </View>
 
-      <Box>
-        <Text fontWeight="medium" mb={2}>3. 測試環境</Text>
-        <Text fontSize="sm" color="gray.600" mb={1}>
-          測試環境使用以下範例憑證：
-        </Text>
-        <Box p={3} bg="gray.100" borderRadius="md" fontSize="sm" fontFamily="mono">
-          <Text>商店代號: 2000132</Text>
-          <Text>HashKey: 5294y06JbISpM5x9</Text>
-          <Text>HashIV: v77hoKGq4kWxNNIS</Text>
-        </Box>
-      </Box>
+        <View style={styles.formControl}>
+          <Text style={styles.label}>Webhook Secret (選填)</Text>
+          <Input
+            value={(credentials as StripeCredentials).webhookSecret}
+            onChangeText={(text) => setCredentials({ ...credentials, webhookSecret: text })}
+            placeholder="whsec_..."
+            secureTextEntry
+          />
+          {errors.webhookSecret ? <Text style={styles.errorText}>{errors.webhookSecret}</Text> : null}
+          <Text style={styles.helperText}>用於驗證 Webhook 請求</Text>
+        </View>
 
-      <Alert status="warning" size="sm">
-        <AlertIcon />
-        <AlertDescription fontSize="sm">
-          正式環境請使用您實際的 ECPay 商店憑證，測試憑證僅供開發測試使用
-        </AlertDescription>
-      </Alert>
-    </VStack>
+        <View style={styles.formControl}>
+          <View style={styles.switchRow}>
+            <View style={styles.switchLabel}>
+              <Text style={styles.label}>測試模式</Text>
+              <Text style={styles.helperText}>
+                {(credentials as StripeCredentials).useSandbox 
+                  ? '使用 Stripe 測試環境'
+                  : '使用 Stripe 正式環境'}
+              </Text>
+            </View>
+            <Switch
+              value={(credentials as StripeCredentials).useSandbox}
+              onValueChange={(value) => setCredentials({ ...credentials, useSandbox: value })}
+            />
+          </View>
+        </View>
+      </View>
+    </View>
   );
 
   return (
-    <Card bg={bgColor} borderWidth={1} borderColor={borderColor}>
-      <CardHeader>
-        <HStack justify="space-between">
-          <HStack spacing={3}>
-            <Icon as={FaCreditCard} color="blue.500" boxSize={6} />
-            <VStack spacing={0} align="start">
-              <Heading as="h3" size="md">
-                {getProviderName(providerId)} 憑證設定
-              </Heading>
-              <Text fontSize="sm" color="gray.600">
-                {provider ? '編輯付款方式憑證' : '新增付款方式憑證'}
-              </Text>
-            </VStack>
-          </HStack>
-          <Badge colorScheme={providerId === 'ecpay' ? 'green' : 'blue'}>
-            {providerId.toUpperCase()}
-          </Badge>
-        </HStack>
-      </CardHeader>
+    <Card containerStyle={styles.card}>
+      <ScrollView>
+        <Text h4 style={styles.title}>
+          {provider ? '編輯' : '新增'} {providerId === 'ecpay' ? 'ECPay' : 'Stripe'} 付款設定
+        </Text>
+        <Divider style={styles.divider} />
 
-      <CardBody>
-        <Tabs>
-          <TabList>
-            <Tab>憑證設定</Tab>
-            <Tab>設定說明</Tab>
-          </TabList>
+        {providerId === 'ecpay' ? renderECPayForm() : renderStripeForm()}
 
-          <TabPanels>
-            <TabPanel px={0}>
-              <VStack spacing={6}>
-                {providerId === 'ecpay' && renderECPayForm()}
+        <View style={styles.settingsSection}>
+          <View style={styles.switchRow}>
+            <View style={styles.switchLabel}>
+              <Text style={styles.label}>啟用此付款方式</Text>
+              <Text style={styles.helperText}>啟用後，活動可以使用此付款方式收款</Text>
+            </View>
+            <Switch
+              value={isActive}
+              onValueChange={setIsActive}
+            />
+          </View>
 
-                <Divider />
+          <View style={styles.switchRow}>
+            <View style={styles.switchLabel}>
+              <Text style={styles.label}>設為預設付款方式</Text>
+              <Text style={styles.helperText}>新活動將預設使用此付款方式</Text>
+            </View>
+            <Switch
+              value={isDefault}
+              onValueChange={setIsDefault}
+            />
+          </View>
+        </View>
 
-                {/* Provider Settings */}
-                <VStack spacing={4} w="full">
-                  <FormControl>
-                    <HStack justify="space-between">
-                      <VStack spacing={0} align="start">
-                        <FormLabel mb={0}>啟用此付款方式</FormLabel>
-                        <FormHelperText mt={0}>
-                          停用後，使用者將無法選擇此付款方式
-                        </FormHelperText>
-                      </VStack>
-                      <Switch
-                        isChecked={isActive}
-                        onChange={(e) => setIsActive(e.target.checked)}
-                        colorScheme="green"
-                      />
-                    </HStack>
-                  </FormControl>
+        <Divider style={styles.divider} />
 
-                  <FormControl>
-                    <HStack justify="space-between">
-                      <VStack spacing={0} align="start">
-                        <FormLabel mb={0}>設為預設付款方式</FormLabel>
-                        <FormHelperText mt={0}>
-                          新的付款將優先使用此付款方式
-                        </FormHelperText>
-                      </VStack>
-                      <Switch
-                        isChecked={isDefault}
-                        onChange={(e) => setIsDefault(e.target.checked)}
-                        colorScheme="blue"
-                      />
-                    </HStack>
-                  </FormControl>
-                </VStack>
-
-                <Divider />
-
-                {/* Action Buttons */}
-                <HStack spacing={3} w="full" justify="end">
-                  <Button
-                    variant="outline"
-                    onClick={onCancel}
-                    isDisabled={isSaving || isLoading}
-                  >
-                    取消
-                  </Button>
-                  <Button
-                    colorScheme="blue"
-                    onClick={handleSave}
-                    isLoading={isSaving || isLoading}
-                    leftIcon={<CheckIcon />}
-                  >
-                    {provider ? '更新設定' : '儲存設定'}
-                  </Button>
-                </HStack>
-              </VStack>
-            </TabPanel>
-
-            <TabPanel px={0}>
-              {providerId === 'ecpay' && renderConfigurationHelp()}
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-      </CardBody>
+        <View style={styles.buttonRow}>
+          <Button
+            title="取消"
+            type="outline"
+            onPress={onCancel}
+            disabled={isSaving || isLoading}
+            containerStyle={styles.button}
+          />
+          <Button
+            title={provider ? '更新' : '新增'}
+            onPress={handleSave}
+            loading={isSaving || isLoading}
+            disabled={isSaving || isLoading}
+            containerStyle={styles.button}
+          />
+        </View>
+      </ScrollView>
     </Card>
   );
 };
+
+const styles = StyleSheet.create({
+  card: {
+    margin: 0,
+    padding: 0,
+    borderRadius: 8,
+  },
+  title: {
+    padding: 16,
+    paddingBottom: 8,
+  },
+  divider: {
+    marginVertical: 16,
+  },
+  container: {
+    padding: 16,
+  },
+  section: {
+    marginBottom: 20,
+  },
+  formControl: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#2D3748',
+  },
+  errorText: {
+    color: '#E53E3E',
+    fontSize: 14,
+    marginTop: 4,
+  },
+  helperText: {
+    color: '#718096',
+    fontSize: 14,
+    marginTop: 4,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  switchLabel: {
+    flex: 1,
+    marginRight: 16,
+  },
+  testCredentialsBox: {
+    backgroundColor: '#EBF8FF',
+    padding: 16,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#3182CE',
+  },
+  testCredentialsContent: {
+    flex: 1,
+  },
+  testCredentialsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  testCredentialsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2C5282',
+    marginLeft: 8,
+  },
+  testCredentialsDescription: {
+    fontSize: 14,
+    color: '#2A4E7C',
+    marginBottom: 12,
+  },
+  alert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 6,
+    marginTop: 12,
+  },
+  alertSuccess: {
+    backgroundColor: '#C6F6D5',
+  },
+  alertError: {
+    backgroundColor: '#FED7D7',
+  },
+  alertText: {
+    fontSize: 14,
+    marginLeft: 8,
+    flex: 1,
+  },
+  settingsSection: {
+    padding: 16,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: 16,
+    gap: 12,
+  },
+  button: {
+    minWidth: 100,
+  },
+});
 
 export default PaymentProviderCredentialsForm;

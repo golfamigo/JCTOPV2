@@ -61,6 +61,18 @@ class AttendeeService {
     return apiClient.get<AttendeeListResponse>(`/events/${eventId}/attendees${query}`);
   }
 
+  async resendTicket(eventId: string, attendeeId: string): Promise<void> {
+    await apiClient.post(`/events/${eventId}/attendees/${attendeeId}/resend-ticket`);
+  }
+
+  async checkInAttendee(eventId: string, attendeeId: string): Promise<AttendeeDto> {
+    return await apiClient.post<AttendeeDto>(`/events/${eventId}/attendees/${attendeeId}/check-in`);
+  }
+
+  async cancelRegistration(eventId: string, attendeeId: string): Promise<AttendeeDto> {
+    return await apiClient.post<AttendeeDto>(`/events/${eventId}/attendees/${attendeeId}/cancel`);
+  }
+
   async exportEventAttendees(eventId: string, params: AttendeeExportParams): Promise<void> {
     if (!eventId) {
       throw new Error('Event ID is required');
@@ -76,7 +88,7 @@ class AttendeeService {
     
     try {
       // Get auth headers
-      const headers = await apiClient['getAuthHeaders']();
+      const headers = await apiClient['getAuthHeaders']() as Record<string, string>;
       if (!headers || !headers['Authorization']) {
         throw new Error('Authentication required');
       }

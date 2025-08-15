@@ -1,6 +1,5 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ChakraProvider } from '@chakra-ui/react';
 import { CheckInStatisticsHeader } from './CheckInStatisticsHeader';
 import { EventStatistics } from '../../../services/statisticsService';
 

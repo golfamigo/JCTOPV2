@@ -1,4 +1,5 @@
-import { Camera, CameraType } from 'expo-camera';
+import { Camera } from 'expo-camera';
+import * as ExpoCamera from 'expo-camera';
 import { ensureCameraPermissions, CameraPermissionResult } from '../utils/permissions';
 
 export interface CameraServiceResult<T = any> {
@@ -8,7 +9,7 @@ export interface CameraServiceResult<T = any> {
 }
 
 export interface CameraConfiguration {
-  type: CameraType;
+  type: 'back' | 'front';
   autoFocus: boolean;
   flashMode: 'on' | 'off' | 'auto';
 }
@@ -72,7 +73,7 @@ export class CameraService {
    */
   getDefaultConfiguration(): CameraConfiguration {
     return {
-      type: CameraType.back,
+      type: 'back',
       autoFocus: true,
       flashMode: 'auto'
     };
@@ -81,8 +82,8 @@ export class CameraService {
   /**
    * Switch between front and back camera
    */
-  switchCameraType(currentType: CameraType): CameraType {
-    return currentType === CameraType.back ? CameraType.front : CameraType.back;
+  switchCameraType(currentType: 'back' | 'front'): 'back' | 'front' {
+    return currentType === 'back' ? 'front' : 'back';
   }
 
   /**

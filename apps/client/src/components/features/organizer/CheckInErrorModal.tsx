@@ -1,19 +1,8 @@
 import React from 'react';
-import {
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Button,
-  VStack,
-  Text,
-  Icon,
-  Box,
-  useColorModeValue,
-} from '@chakra-ui/react';
-import { WarningIcon, NotAllowedIcon, InfoIcon } from '@chakra-ui/icons';
+import { View, StyleSheet } from 'react-native';
+import { Overlay, Button, Text, Icon } from '@rneui/themed';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useAppTheme } from '../../../theme';
 
 interface CheckInErrorModalProps {
   isOpen: boolean;
@@ -28,37 +17,37 @@ export const CheckInErrorModal: React.FC<CheckInErrorModalProps> = ({
   error,
   errorCode,
 }) => {
-  const bgColor = useColorModeValue('white', 'neutral.800');
+  const { colors } = useAppTheme();
   
   const getErrorConfig = () => {
     switch (errorCode) {
       case 'ALREADY_CHECKED_IN':
         return {
-          icon: InfoIcon,
+          iconName: 'info',
           title: 'Already Checked In',
-          bgColor: useColorModeValue('warning.50', 'warning.900'),
-          color: useColorModeValue('warning.600', 'warning.300'),
-          borderColor: useColorModeValue('warning.200', 'warning.700'),
-          buttonScheme: 'warning',
+          bgColor: colors.warning + '20',
+          color: colors.warning,
+          borderColor: colors.warning + '40',
+          description: 'This ticket has already been scanned and the attendee has entered the venue.',
         };
       case 'TICKET_NOT_FOUND':
         return {
-          icon: NotAllowedIcon,
+          iconName: 'block',
           title: 'Ticket Not Found',
-          bgColor: useColorModeValue('error.50', 'error.900'),
-          color: useColorModeValue('error.600', 'error.300'),
-          borderColor: useColorModeValue('error.200', 'error.700'),
-          buttonScheme: 'red',
+          bgColor: colors.error + '20',
+          color: colors.error,
+          borderColor: colors.error + '40',
+          description: 'This QR code is not associated with a valid registration for this event.',
         };
       case 'INVALID_QR_CODE':
       default:
         return {
-          icon: WarningIcon,
+          iconName: 'warning',
           title: 'Invalid QR Code',
-          bgColor: useColorModeValue('error.50', 'error.900'),
-          color: useColorModeValue('error.600', 'error.300'),
-          borderColor: useColorModeValue('error.200', 'error.700'),
-          buttonScheme: 'red',
+          bgColor: colors.error + '20',
+          color: colors.error,
+          borderColor: colors.error + '40',
+          description: 'The scanned QR code is malformed or does not contain valid ticket data.',
         };
     }
   };
@@ -66,106 +55,124 @@ export const CheckInErrorModal: React.FC<CheckInErrorModalProps> = ({
   const config = getErrorConfig();
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      isCentered
-      motionPreset="slideInBottom"
-      size="md"
+    <Overlay
+      isVisible={isOpen}
+      onBackdropPress={onClose}
+      overlayStyle={[styles.overlay, { backgroundColor: colors.card }]}
     >
-      <ModalOverlay />
-      <ModalContent bg={bgColor} borderRadius="16px">
-        <ModalHeader textAlign="center" pt={8}>
-          <VStack spacing={4}>
-            <Box
-              p={4}
-              borderRadius="full"
-              bg={config.bgColor}
+      <View style={styles.container}>
+        {/* Error Icon and Title */}
+        <View style={styles.header}>
+          <View style={[styles.iconContainer, { backgroundColor: config.bgColor }]}>
+            <Icon
+              name={config.iconName}
+              type="material"
               color={config.color}
-            >
-              <Icon as={config.icon} boxSize={12} />
-            </Box>
-            <Text fontSize="2xl" fontWeight="bold" color={config.color}>
-              {config.title}
-            </Text>
-          </VStack>
-        </ModalHeader>
+              size={48}
+            />
+          </View>
+          <Text h3 style={[styles.title, { color: config.color }]}>
+            {config.title}
+          </Text>
+        </View>
 
-        <ModalBody pb={6}>
-          <VStack spacing={4}>
-            <Box
-              p={6}
-              borderRadius="12px"
-              border="2px solid"
-              borderColor={config.borderColor}
-              bg={config.bgColor}
-              width="100%"
-              textAlign="center"
-            >
-              <Text fontSize="lg" fontWeight="medium">
-                {error}
-              </Text>
-            </Box>
+        {/* Error Message */}
+        <View style={[styles.errorCard, { 
+          backgroundColor: config.bgColor,
+          borderColor: config.borderColor
+        }]}>
+          <Text style={[styles.errorMessage, { color: colors.text }]}>
+            {error}
+          </Text>
+        </View>
 
-            {errorCode === 'ALREADY_CHECKED_IN' && (
-              <Box
-                p={4}
-                borderRadius="8px"
-                bg={useColorModeValue('neutral.100', 'neutral.700')}
-                width="100%"
-              >
-                <Text fontSize="sm" color="neutral.600" textAlign="center">
-                  This ticket has already been scanned and the attendee has entered the venue.
-                </Text>
-              </Box>
-            )}
+        {/* Error Description */}
+        <View style={[styles.descriptionCard, { backgroundColor: colors.grey5 }]}>
+          <Text style={[styles.description, { color: colors.grey2 }]}>
+            {config.description}
+          </Text>
+        </View>
 
-            {errorCode === 'TICKET_NOT_FOUND' && (
-              <Box
-                p={4}
-                borderRadius="8px"
-                bg={useColorModeValue('neutral.100', 'neutral.700')}
-                width="100%"
-              >
-                <Text fontSize="sm" color="neutral.600" textAlign="center">
-                  This QR code is not associated with a valid registration for this event.
-                </Text>
-              </Box>
-            )}
+        {/* Scan Time */}
+        <View style={styles.footer}>
+          <Text style={[styles.timestamp, { color: colors.grey2 }]}>
+            Scan time: {new Date().toLocaleTimeString()}
+          </Text>
+        </View>
 
-            {errorCode === 'INVALID_QR_CODE' && (
-              <Box
-                p={4}
-                borderRadius="8px"
-                bg={useColorModeValue('neutral.100', 'neutral.700')}
-                width="100%"
-              >
-                <Text fontSize="sm" color="neutral.600" textAlign="center">
-                  The scanned QR code is malformed or does not contain valid ticket data.
-                </Text>
-              </Box>
-            )}
-          </VStack>
-
-          <Box mt={4} textAlign="center">
-            <Text fontSize="sm" color="neutral.600">
-              Scan time: {new Date().toLocaleTimeString()}
-            </Text>
-          </Box>
-        </ModalBody>
-
-        <ModalFooter>
-          <Button
-            colorScheme={config.buttonScheme}
-            width="100%"
-            size="lg"
-            onClick={onClose}
-            borderRadius="8px"
-          >
-            Try Another Code
-          </Button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
+        {/* Try Another Button */}
+        <Button
+          title="Try Another Code"
+          onPress={onClose}
+          buttonStyle={[styles.button, { backgroundColor: config.color }]}
+          titleStyle={styles.buttonTitle}
+        />
+      </View>
+    </Overlay>
   );
 };
+
+const styles = StyleSheet.create({
+  overlay: {
+    borderRadius: 16,
+    padding: 0,
+    width: '90%',
+    maxWidth: 400,
+  },
+  container: {
+    padding: 24,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  iconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  title: {
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  errorCard: {
+    borderRadius: 12,
+    borderWidth: 2,
+    padding: 20,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  errorMessage: {
+    fontSize: 18,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  descriptionCard: {
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+  },
+  description: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  footer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  timestamp: {
+    fontSize: 14,
+  },
+  button: {
+    borderRadius: 8,
+    paddingVertical: 12,
+  },
+  buttonTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});

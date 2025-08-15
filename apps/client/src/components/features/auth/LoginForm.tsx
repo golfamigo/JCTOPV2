@@ -1,24 +1,17 @@
 import React, { useState } from 'react';
-import {
-  Box,
-  VStack,
-  HStack,
-  Text,
-  Input,
-  Button,
-  FormControl,
-  FormLabel,
-  FormErrorMessage,
-  Alert,
-  AlertIcon,
-  AlertTitle,
-  AlertDescription,
-  useColorModeValue,
-  Divider,
-  Link as ChakraLink,
-} from '@chakra-ui/react';
-import { Link } from 'react-router-dom';
-import GoogleSignInButton from './GoogleSignInButton';
+import { View, ScrollView, StyleSheet } from 'react-native';
+import { Text, Input, Button, Card, Divider, SocialIcon } from '@rneui/themed';
+import { Link } from 'expo-router';
+import { useAppTheme } from '../../../theme';
+import { useTranslation } from '../../../localization';
+import { useResponsive } from '../../../hooks/useResponsive';
+import { useKeyboardAwareScrollView } from '../../../hooks/useKeyboardAwareScrollView';
+import GoogleAuthService from '../../../services/googleAuthService';
+import { LoadingOverlay } from '../../organisms/LoadingOverlay';
+import { ErrorCard } from '../../molecules/ErrorCard';
+import { useNetworkStatus } from '../../../utils/networkStatus';
+import { accessibilityLabels } from '../../../constants/accessibilityLabels';
+import { useScreenReader } from '../../../accessibility/hooks/useScreenReader';
 
 interface LoginData {
   email: string;
@@ -34,27 +27,29 @@ const LoginForm = ({ onLogin, onGoogleSignIn }: LoginFormProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errors, setErrors] = useState<Partial<LoginData>>({});
   const [loginError, setLoginError] = useState<string | null>(null);
-
-  // Design system colors
-  const bgColor = useColorModeValue('#F8FAFC', '#0F172A');
-  const cardBgColor = useColorModeValue('white', '#1E293B');
-  const primaryColor = '#2563EB';
-  const errorColor = '#EF4444';
+  
+  const { colors, spacing, typography } = useAppTheme();
+  const { t } = useTranslation();
+  const networkStatus = useNetworkStatus();
+  const responsive = useResponsive();
+  const { getScrollViewProps } = useKeyboardAwareScrollView();
+  const { announceError, announceSuccess } = useScreenReader();
 
   const validateForm = (): boolean => {
     const newErrors: Partial<LoginData> = {};
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email.trim()) {
-      newErrors.email = 'Email is required';
+      newErrors.email = t('validation.required');
     } else if (!emailRegex.test(email)) {
-      newErrors.email = 'Please provide a valid email address';
+      newErrors.email = t('validation.invalidEmail');
     }
 
     if (!password) {
-      newErrors.password = 'Password is required';
+      newErrors.password = t('validation.required');
     }
 
     setErrors(newErrors);
@@ -63,6 +58,13 @@ const LoginForm = ({ onLogin, onGoogleSignIn }: LoginFormProps) => {
 
   const handleSubmit = async () => {
     if (!validateForm()) {
+      announceError('請檢查輸入的資料');
+      return;
+    }
+
+    if (!networkStatus.isConnected) {
+      setLoginError(t('errors.offline'));
+      announceError(t('errors.offline'));
       return;
     }
 
@@ -70,169 +72,225 @@ const LoginForm = ({ onLogin, onGoogleSignIn }: LoginFormProps) => {
     setLoginError(null);
     try {
       await onLogin({ email, password });
+      announceSuccess('登入成功');
     } catch (error) {
-      setLoginError(error instanceof Error ? error.message : 'An error occurred');
+      const errorMsg = error instanceof Error ? error.message : t('messages.somethingWentWrong');
+      setLoginError(errorMsg);
+      announceError(errorMsg);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    if (isGoogleLoading || isLoading) return;
+
+    if (!networkStatus.isConnected) {
+      setLoginError(t('errors.offline'));
+      return;
+    }
+
+    setIsGoogleLoading(true);
+    setLoginError(null);
+    
+    try {
+      const result = await GoogleAuthService.signInWithGoogle();
+      
+      if (result.success && result.accessToken) {
+        await onGoogleSignIn(result.accessToken);
+      } else {
+        setLoginError(result.error || t('auth.googleSignInFailed'));
+      }
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+      setLoginError(t('auth.failedGoogleSignIn'));
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: spacing.md,
+      minHeight: '100%',
+    },
+    scrollContent: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: responsive.isLandscape && responsive.isPhone ? spacing.sm : spacing.lg,
+    },
+    card: {
+      width: '100%',
+      maxWidth: responsive.isDesktop ? 480 : responsive.isTablet ? 400 : 320,
+      padding: responsive.isLandscape && responsive.isPhone ? spacing.md : spacing.lg,
+    },
+    title: {
+      textAlign: 'center',
+      marginBottom: spacing.lg,
+      ...typography.h1,
+    },
+    errorCard: {
+      backgroundColor: colors.danger,
+      borderColor: colors.danger,
+      marginBottom: spacing.md,
+      padding: spacing.md,
+    },
+    errorText: {
+      color: colors.white,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    inputContainer: {
+      marginBottom: spacing.md,
+    },
+    forgotPasswordContainer: {
+      alignItems: 'flex-end',
+      marginBottom: spacing.sm,
+    },
+    forgotPasswordText: {
+      color: colors.primary,
+      fontSize: 14,
+      textDecorationLine: 'underline',
+    },
+    submitButton: {
+      marginTop: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    dividerContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginVertical: spacing.md,
+    },
+    divider: {
+      flex: 1,
+    },
+    dividerText: {
+      marginHorizontal: spacing.md,
+      color: colors.textSecondary,
+      fontSize: 14,
+    },
+    googleButton: {
+      marginTop: spacing.sm,
+    },
+  });
+
   return (
-    <Box
-      minH="100vh"
-      bg={bgColor}
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
-      px={4}
-    >
-      <Box
-        maxW="400px"
-        w="100%"
-        bg={cardBgColor}
-        p={8}
-        borderRadius="md"
-        boxShadow="lg"
-        border="1px"
-        borderColor="gray.200"
+    <View style={styles.container}>
+      <ScrollView 
+        {...getScrollViewProps()}
+        contentContainerStyle={[styles.scrollContent, getScrollViewProps().contentContainerStyle]}
+        showsVerticalScrollIndicator={false}
       >
-        <VStack spacing={6}>
+        <Card containerStyle={styles.card}>
           {/* Title */}
-          <Text
-            fontSize="36px"
-            fontWeight="bold"
-            color="gray.900"
-            textAlign="center"
-            fontFamily="Inter"
-            lineHeight={1.2}
-          >
-            Sign In
+          <Text style={styles.title} accessibilityRole="header">
+            {t('auth.signIn')}
           </Text>
 
           {/* Login Error Alert */}
           {loginError && (
-            <Alert status="error" borderRadius="md">
-              <AlertIcon />
-              <Box>
-                <AlertTitle>Login Failed!</AlertTitle>
-                <AlertDescription>{loginError}</AlertDescription>
-              </Box>
-            </Alert>
+            <ErrorCard
+              title={t('auth.loginFailed')}
+              message={loginError}
+              errorType={!networkStatus.isConnected ? 'network' : 'generic'}
+              onDismiss={() => setLoginError(null)}
+              containerStyle={{ marginBottom: spacing.md }}
+            />
           )}
 
           {/* Email Field */}
-          <FormControl isInvalid={!!errors.email}>
-            <FormLabel
-              fontSize="16px"
-              fontWeight="600"
-              color="gray.700"
-              fontFamily="Inter"
-            >
-              Email
-            </FormLabel>
+          <View style={styles.inputContainer}>
             <Input
-              type="email"
+              label={t('auth.email')}
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              size="lg"
-              borderColor={errors.email ? errorColor : 'gray.300'}
-              _hover={{ borderColor: errors.email ? errorColor : 'gray.400' }}
-              _focus={{ 
-                borderColor: errors.email ? errorColor : primaryColor, 
-                boxShadow: `0 0 0 1px ${errors.email ? errorColor : primaryColor}` 
-              }}
+              onChangeText={setEmail}
+              placeholder={t('auth.enterEmail')}
+              keyboardType="email-address"
+              autoCapitalize="none"
               autoComplete="email"
+              errorMessage={errors.email}
+              testID="email-input"
+              accessibilityLabel={accessibilityLabels.forms.email_input}
+              accessibilityHint={accessibilityLabels.hints.email_format}
             />
-            <FormErrorMessage color={errorColor}>
-              {errors.email}
-            </FormErrorMessage>
-          </FormControl>
+          </View>
 
           {/* Password Field */}
-          <FormControl isInvalid={!!errors.password}>
-            <FormLabel
-              fontSize="16px"
-              fontWeight="600"
-              color="gray.700"
-              fontFamily="Inter"
-            >
-              Password
-            </FormLabel>
+          <View style={styles.inputContainer}>
             <Input
-              type="password"
+              label={t('auth.password')}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              size="lg"
-              borderColor={errors.password ? errorColor : 'gray.300'}
-              _hover={{ borderColor: errors.password ? errorColor : 'gray.400' }}
-              _focus={{ 
-                borderColor: errors.password ? errorColor : primaryColor, 
-                boxShadow: `0 0 0 1px ${errors.password ? errorColor : primaryColor}` 
-              }}
+              onChangeText={setPassword}
+              placeholder={t('auth.enterPassword')}
+              secureTextEntry
+              autoCapitalize="none"
               autoComplete="current-password"
+              errorMessage={errors.password}
+              testID="password-input"
+              accessibilityLabel={accessibilityLabels.forms.password_input}
+              accessibilityHint={accessibilityLabels.hints.password_requirements}
             />
-            <FormErrorMessage color={errorColor}>
-              {errors.password}
-            </FormErrorMessage>
-          </FormControl>
+          </View>
 
           {/* Forgot Password Link */}
-          <Box w="100%" textAlign="right">
-            <ChakraLink
-              as={Link}
-              to="/forgot-password"
-              color={primaryColor}
-              fontSize="14px"
-              fontFamily="Inter"
-              _hover={{ textDecoration: 'underline' }}
-            >
-              Forgot your password?
-            </ChakraLink>
-          </Box>
+          <View style={styles.forgotPasswordContainer}>
+            <Link href="/auth/forgot-password" asChild>
+              <Text 
+                style={styles.forgotPasswordText}
+                accessibilityRole="link"
+                accessibilityLabel={accessibilityLabels.buttons.forgotPassword}
+              >
+                {t('auth.forgotPassword')}
+              </Text>
+            </Link>
+          </View>
 
           {/* Submit Button */}
           <Button
-            onClick={handleSubmit}
-            isLoading={isLoading}
-            loadingText="Signing In..."
-            bg={primaryColor}
-            color="white"
-            size="lg"
-            w="100%"
-            _hover={{ bg: '#1D4ED8' }}
-            _active={{ bg: '#1E40AF' }}
-            _disabled={{ bg: 'gray.400', cursor: 'not-allowed' }}
-            fontFamily="Inter"
-            fontWeight="600"
-            mt={4}
-          >
-            Sign In
-          </Button>
+            title={isLoading ? t('auth.signingIn') : t('auth.signIn')}
+            onPress={handleSubmit}
+            loading={isLoading}
+            disabled={isLoading || isGoogleLoading}
+            buttonStyle={styles.submitButton}
+            testID="signin-button"
+            accessibilityLabel={accessibilityLabels.buttons.login}
+            accessibilityHint={accessibilityLabels.hints.double_tap_to_activate}
+            accessibilityState={{ disabled: isLoading || isGoogleLoading, busy: isLoading }}
+          />
 
           {/* Divider */}
-          <HStack spacing={4} w="100%">
-            <Divider />
-            <Text 
-              fontSize="14px" 
-              color="gray.500" 
-              fontFamily="Inter"
-              whiteSpace="nowrap"
-            >
-              or
+          <View style={styles.dividerContainer}>
+            <Divider style={styles.divider} />
+            <Text style={styles.dividerText}>
+              {t('auth.or')}
             </Text>
-            <Divider />
-          </HStack>
+            <Divider style={styles.divider} />
+          </View>
 
           {/* Google Sign-In Button */}
-          <GoogleSignInButton
-            onGoogleSignIn={onGoogleSignIn}
-            isLoading={isLoading}
+          <SocialIcon
+            title={isGoogleLoading ? t('auth.signingInWithGoogle') : t('auth.signInWithGoogle')}
+            button
+            type="google"
+            onPress={handleGoogleSignIn}
+            loading={isGoogleLoading}
+            disabled={isLoading || isGoogleLoading}
+            style={styles.googleButton}
           />
-        </VStack>
-      </Box>
-    </Box>
+        </Card>
+      </ScrollView>
+      <LoadingOverlay
+        visible={isLoading || isGoogleLoading}
+        message={isGoogleLoading ? t('auth.signingInWithGoogle') : t('auth.signingIn')}
+        variant="spinner"
+      />
+    </View>
   );
 };
 

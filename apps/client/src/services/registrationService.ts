@@ -13,18 +13,15 @@ class RegistrationService {
   }
 
   async getRegistration(registrationId: string): Promise<Registration> {
-    const response = await apiClient.get(`/api/v1/registrations/${registrationId}`);
-    return response.data;
+    return await apiClient.get<Registration>(`/registrations/${registrationId}`);
   }
 
   async getUserRegistrations(): Promise<Registration[]> {
-    const response = await apiClient.get('/api/v1/registrations');
-    return response.data;
+    return await apiClient.get<Registration[]>('/registrations');
   }
 
   async completeRegistration(registrationId: string): Promise<{ success: boolean; registration: Registration }> {
-    const response = await apiClient.post(`/api/v1/registrations/${registrationId}/complete`);
-    return response.data;
+    return await apiClient.post<{ success: boolean; registration: Registration }>(`/registrations/${registrationId}/complete`);
   }
 
   formatRegistrationStatus(status: Registration['status']): string {

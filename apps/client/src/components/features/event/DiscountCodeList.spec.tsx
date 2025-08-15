@@ -1,6 +1,5 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ChakraProvider } from '@chakra-ui/react';
 import DiscountCodeList from './DiscountCodeList';
 import discountCodeService from '../../../services/discountCodeService';
 import { DiscountCodeResponse } from '@jctop-event/shared-types';
@@ -11,10 +10,7 @@ const mockedDiscountCodeService = discountCodeService as jest.Mocked<typeof disc
 
 // Mock toast hook
 const mockToast = jest.fn();
-jest.mock('@chakra-ui/react', () => ({
-  ...jest.requireActual('@chakra-ui/react'),
-  useToast: () => mockToast,
-}));
+// Removed ChakraUI mock
 
 const renderComponent = (props: any = {}) => {
   const defaultProps = {

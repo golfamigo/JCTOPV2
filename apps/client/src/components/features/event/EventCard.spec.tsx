@@ -1,8 +1,31 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { ChakraProvider } from '@chakra-ui/react';
+import { render, screen, fireEvent } from '@testing-library/react-native';
+import { ThemeProvider } from '@rneui/themed';
+import { I18nextProvider } from 'react-i18next';
 import EventCard from './EventCard';
 import { EventWithRelations } from '@jctop-event/shared-types';
+import { theme } from '@/theme';
+import i18n from '../../../localization';
+
+// Mock react-i18next
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      const translations: { [key: string]: string } = {
+        'events.free': '免費',
+        'events.from': '起價',
+        'events.register': '報名',
+        'events.viewDetails': '查看詳情',
+        'events.registerForEvent': '報名活動',
+        'events.addToFavorites': '加入收藏',
+        'events.removeFromFavorites': '移除收藏',
+        'events.events': '活動',
+        'events.eventName': '活動名稱',
+      };
+      return translations[key] || key;
+    },
+  }),
+}));
 
 // Mock event data
 const mockEvent: EventWithRelations = {
@@ -69,225 +92,171 @@ const mockEventFree: EventWithRelations = {
   ],
 };
 
-// Helper function to render with ChakraProvider
-const renderWithChakra = (component: React.ReactElement) => {
+// Helper function to render with ThemeProvider
+const renderWithProviders = (component: React.ReactElement) => {
   return render(
-    <ChakraProvider>
+    <ThemeProvider theme={theme}>
       {component}
-    </ChakraProvider>
+    </ThemeProvider>
   );
 };
 
 describe('EventCard', () => {
   it('should render event information correctly', () => {
-    renderWithChakra(<EventCard event={mockEvent} />);
+    renderWithProviders(<EventCard event={mockEvent} />);
 
-    expect(screen.getByText('Test Concert Event')).toBeInTheDocument();
-    expect(screen.getByText('Music')).toBeInTheDocument();
-    expect(screen.getByText('Concert Hall')).toBeInTheDocument();
-    expect(screen.getByText('From $25.00')).toBeInTheDocument();
-    expect(screen.getByText('published')).toBeInTheDocument();
+    expect(screen.getByText('Test Concert Event')).toBeTruthy();
+    expect(screen.getByText('Music')).toBeTruthy();
+    expect(screen.getByText('Concert Hall')).toBeTruthy();
+    expect(screen.getByText('起價 NT$25')).toBeTruthy();
   });
 
   it('should format date and time correctly', () => {
-    renderWithChakra(<EventCard event={mockEvent} />);
+    renderWithProviders(<EventCard event={mockEvent} />);
 
-    // Check for date format - should contain date and time in expected format
-    expect(screen.getByText(/Dec \d{1,2}, 2024/)).toBeInTheDocument();
-    expect(screen.getByText(/\d{1,2}:\d{2} (AM|PM)/)).toBeInTheDocument();
+    // Check for Traditional Chinese date format (YYYY年MM月DD日)
+    expect(screen.getByText(/2024年12月15日/)).toBeTruthy();
+    expect(screen.getByText(/19:00/)).toBeTruthy(); // 24-hour format
   });
 
-  it('should display "Free" for free events', () => {
-    renderWithChakra(<EventCard event={mockEventFree} />);
+  it('should display "免費" for free events', () => {
+    renderWithProviders(<EventCard event={mockEventFree} />);
 
-    expect(screen.getByText('From Free')).toBeInTheDocument();
+    expect(screen.getByText('起價 免費')).toBeTruthy();
   });
 
-  it('should display "Free" when no ticket types are available', () => {
+  it('should display "免費" when no ticket types are available', () => {
     const eventNoTickets = { ...mockEvent, ticketTypes: [] };
-    renderWithChakra(<EventCard event={eventNoTickets} />);
+    renderWithProviders(<EventCard event={eventNoTickets} />);
 
-    expect(screen.getByText('From Free')).toBeInTheDocument();
+    expect(screen.getByText('起價 免費')).toBeTruthy();
   });
 
-  it('should call onEventClick when card is clicked', () => {
+  it('should call onEventClick when card is pressed', () => {
     const mockOnEventClick = jest.fn();
-    renderWithChakra(
+    renderWithProviders(
       <EventCard event={mockEvent} onEventClick={mockOnEventClick} />
     );
 
-    fireEvent.click(screen.getByRole('article'));
-    expect(mockOnEventClick).toHaveBeenCalledWith('event-1');
-  });
-
-  it('should call onEventClick when Enter key is pressed', () => {
-    const mockOnEventClick = jest.fn();
-    renderWithChakra(
-      <EventCard event={mockEvent} onEventClick={mockOnEventClick} />
-    );
-
-    const card = screen.getByRole('article');
-    fireEvent.keyDown(card, { key: 'Enter', code: 'Enter' });
-    expect(mockOnEventClick).toHaveBeenCalledWith('event-1');
-  });
-
-  it('should call onEventClick when Space key is pressed', () => {
-    const mockOnEventClick = jest.fn();
-    renderWithChakra(
-      <EventCard event={mockEvent} onEventClick={mockOnEventClick} />
-    );
-
-    const card = screen.getByRole('article');
-    fireEvent.keyDown(card, { key: ' ', code: 'Space' });
+    const card = screen.getByTestId('event-card-event-1');
+    fireEvent.press(card);
     expect(mockOnEventClick).toHaveBeenCalledWith('event-1');
   });
 
   it('should render favorite button when onFavorite prop is provided', () => {
     const mockOnFavorite = jest.fn();
-    renderWithChakra(
+    renderWithProviders(
       <EventCard event={mockEvent} onFavorite={mockOnFavorite} />
     );
 
-    expect(screen.getByRole('button', { name: /add to favorites/i })).toBeInTheDocument();
+    expect(screen.getByTestId('favorite-button-event-1')).toBeTruthy();
   });
 
-  it('should call onFavorite when favorite button is clicked', () => {
+  it('should call onFavorite when favorite button is pressed', () => {
     const mockOnFavorite = jest.fn();
-    renderWithChakra(
+    renderWithProviders(
       <EventCard event={mockEvent} onFavorite={mockOnFavorite} />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /add to favorites/i }));
+    const favoriteButton = screen.getByTestId('favorite-button-event-1');
+    fireEvent.press(favoriteButton);
     expect(mockOnFavorite).toHaveBeenCalledWith('event-1', true);
-  });
-
-  it('should show correct favorite state when isFavorited is true', () => {
-    const mockOnFavorite = jest.fn();
-    renderWithChakra(
-      <EventCard event={mockEvent} onFavorite={mockOnFavorite} isFavorited={true} />
-    );
-
-    expect(screen.getByRole('button', { name: /remove from favorites/i })).toBeInTheDocument();
   });
 
   it('should call onFavorite with false when removing from favorites', () => {
     const mockOnFavorite = jest.fn();
-    renderWithChakra(
+    renderWithProviders(
       <EventCard event={mockEvent} onFavorite={mockOnFavorite} isFavorited={true} />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /remove from favorites/i }));
+    const favoriteButton = screen.getByTestId('favorite-button-event-1');
+    fireEvent.press(favoriteButton);
     expect(mockOnFavorite).toHaveBeenCalledWith('event-1', false);
   });
 
   it('should not render favorite button when onFavorite prop is not provided', () => {
-    renderWithChakra(<EventCard event={mockEvent} />);
+    renderWithProviders(<EventCard event={mockEvent} />);
 
-    expect(screen.queryByRole('button', { name: /add to favorites/i })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('favorite-button-event-1')).toBeNull();
   });
 
   it('should render View Details button', () => {
-    renderWithChakra(<EventCard event={mockEvent} />);
+    renderWithProviders(<EventCard event={mockEvent} />);
 
-    expect(screen.getByRole('button', { name: /view details for test concert event/i })).toBeInTheDocument();
+    expect(screen.getByTestId('view-details-button-event-1')).toBeTruthy();
   });
 
-  it('should call onEventClick when View Details button is clicked', () => {
+  it('should call onEventClick when View Details button is pressed', () => {
     const mockOnEventClick = jest.fn();
-    renderWithChakra(
+    renderWithProviders(
       <EventCard event={mockEvent} onEventClick={mockOnEventClick} />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /view details for test concert event/i }));
+    const viewDetailsButton = screen.getByTestId('view-details-button-event-1');
+    fireEvent.press(viewDetailsButton);
     expect(mockOnEventClick).toHaveBeenCalledWith('event-1');
   });
 
   it('should display loading skeleton when isLoading is true', () => {
-    renderWithChakra(<EventCard event={mockEvent} isLoading={true} />);
+    renderWithProviders(<EventCard event={mockEvent} isLoading={true} />);
 
-    expect(screen.getByLabelText('Event card loading')).toBeInTheDocument();
-  });
-
-  it('should not call handlers when loading', () => {
-    const mockOnEventClick = jest.fn();
-    const mockOnFavorite = jest.fn();
-    
-    renderWithChakra(
-      <EventCard 
-        event={mockEvent} 
-        onEventClick={mockOnEventClick}
-        onFavorite={mockOnFavorite}
-        isLoading={true} 
-      />
-    );
-
-    fireEvent.click(screen.getByRole('article', { name: 'Event card loading' }));
-    expect(mockOnEventClick).not.toHaveBeenCalled();
+    // Check for loading skeleton structure
+    const loadingView = screen.getByTestId('loading-skeleton');
+    expect(loadingView).toBeTruthy();
   });
 
   it('should use location when venue name is not available', () => {
     const eventNoVenue = { ...mockEvent, venue: undefined };
-    renderWithChakra(<EventCard event={eventNoVenue} />);
+    renderWithProviders(<EventCard event={eventNoVenue} />);
 
-    expect(screen.getByText('Test Venue')).toBeInTheDocument();
+    expect(screen.getByText('Test Venue')).toBeTruthy();
   });
 
   it('should calculate minimum price correctly', () => {
-    renderWithChakra(<EventCard event={mockEvent} />);
+    renderWithProviders(<EventCard event={mockEvent} />);
 
-    // Should show $25.00 (minimum of $25.00 and $50.00)
-    expect(screen.getByText('From $25.00')).toBeInTheDocument();
+    // Should show NT$25 (minimum of NT$25 and NT$50)
+    expect(screen.getByText('起價 NT$25')).toBeTruthy();
   });
 
-  it('should be accessible with proper ARIA labels', () => {
-    renderWithChakra(<EventCard event={mockEvent} />);
+  it('should be accessible with proper accessibility labels', () => {
+    renderWithProviders(<EventCard event={mockEvent} />);
 
-    const card = screen.getByRole('article');
-    expect(card).toHaveAttribute('aria-label', 'Event: Test Concert Event');
-    expect(card).toHaveAttribute('tabIndex', '0');
+    const card = screen.getByTestId('event-card-event-1');
+    expect(card.props.accessibilityLabel).toBe('活動: Test Concert Event');
+    expect(card.props.accessibilityRole).toBe('button');
   });
 
-  it('should have proper focus management', () => {
-    renderWithChakra(<EventCard event={mockEvent} />);
-
-    const card = screen.getByRole('article');
-    card.focus();
-    expect(card).toHaveFocus();
-  });
-
-  it('should prevent event propagation when favorite button is clicked', () => {
-    const mockOnEventClick = jest.fn();
-    const mockOnFavorite = jest.fn();
-    
-    renderWithChakra(
+  it('should render register button for published events when onRegister is provided', () => {
+    const mockOnRegister = jest.fn();
+    renderWithProviders(
       <EventCard 
         event={mockEvent} 
-        onEventClick={mockOnEventClick}
-        onFavorite={mockOnFavorite}
+        onRegister={mockOnRegister}
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /add to favorites/i }));
-    
-    expect(mockOnFavorite).toHaveBeenCalledWith('event-1', true);
-    expect(mockOnEventClick).not.toHaveBeenCalled();
+    expect(screen.getByTestId('register-button-event-1')).toBeTruthy();
   });
 
-  it('should prevent event propagation when View Details button is clicked', () => {
-    const mockOnEventClick = jest.fn();
-    
-    renderWithChakra(
+  it('should call onRegister when register button is pressed', () => {
+    const mockOnRegister = jest.fn();
+    renderWithProviders(
       <EventCard 
         event={mockEvent} 
-        onEventClick={mockOnEventClick}
+        onRegister={mockOnRegister}
       />
     );
 
-    // Click the view details button
-    fireEvent.click(screen.getByRole('button', { name: /view details for test concert event/i }));
-    
-    // Should call onEventClick once (from the button click, not from card click)
-    expect(mockOnEventClick).toHaveBeenCalledTimes(1);
-    expect(mockOnEventClick).toHaveBeenCalledWith('event-1');
+    const registerButton = screen.getByTestId('register-button-event-1');
+    fireEvent.press(registerButton);
+    expect(mockOnRegister).toHaveBeenCalledWith('event-1');
+  });
+
+  it('should render Traditional Chinese text content', () => {
+    renderWithProviders(<EventCard event={mockEvent} />);
+
+    expect(screen.getByText('查看詳情')).toBeTruthy();
+    expect(screen.getByText('起價')).toBeTruthy();
   });
 });

@@ -1,13 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import {
-  HStack,
-  IconButton,
-  Text,
-  Input,
-  useColorModeValue,
-  Tooltip,
-} from '@chakra-ui/react';
-import { MinusIcon, AddIcon } from '@chakra-ui/icons';
+import { View, TextInput, StyleSheet, Dimensions } from 'react-native';
+import { Button, Icon, Text } from '@rneui/themed';
+import { useTranslation } from 'react-i18next';
+import { useAppTheme } from '@/theme';
 
 interface TicketQuantityPickerProps {
   value: number;
@@ -15,7 +10,6 @@ interface TicketQuantityPickerProps {
   max: number;
   onChange: (quantity: number) => void;
   isDisabled?: boolean;
-  'aria-label'?: string;
 }
 
 const TicketQuantityPicker: React.FC<TicketQuantityPickerProps> = ({
@@ -24,15 +18,13 @@ const TicketQuantityPicker: React.FC<TicketQuantityPickerProps> = ({
   max,
   onChange,
   isDisabled = false,
-  'aria-label': ariaLabel,
 }) => {
+  const { t } = useTranslation();
+  const { colors, spacing } = useAppTheme();
   const [inputValue, setInputValue] = useState(value.toString());
 
-  // Design system colors following branding guide
-  const primaryColor = '#2563EB';
-  const borderColor = useColorModeValue('#E2E8F0', '#475569');
-  const neutralMedium = '#64748B';
-  const errorColor = '#EF4444';
+  const windowWidth = Dimensions.get('window').width;
+  const isTablet = windowWidth >= 768;
 
   useEffect(() => {
     setInputValue(value.toString());
@@ -50,11 +42,9 @@ const TicketQuantityPicker: React.FC<TicketQuantityPickerProps> = ({
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
+  const handleInputChange = (newValue: string) => {
     setInputValue(newValue);
 
-    // Parse and validate the input
     const numValue = parseInt(newValue, 10);
     if (!isNaN(numValue) && numValue >= min && numValue <= max) {
       onChange(numValue);
@@ -62,7 +52,6 @@ const TicketQuantityPicker: React.FC<TicketQuantityPickerProps> = ({
   };
 
   const handleInputBlur = () => {
-    // Reset to current valid value if input is invalid
     const numValue = parseInt(inputValue, 10);
     if (isNaN(numValue) || numValue < min || numValue > max) {
       setInputValue(value.toString());
@@ -72,76 +61,103 @@ const TicketQuantityPicker: React.FC<TicketQuantityPickerProps> = ({
   const isDecrementDisabled = value <= min || isDisabled;
   const isIncrementDisabled = value >= max || isDisabled;
 
-  return (
-    <HStack spacing={2} role="group" aria-label={ariaLabel || "Quantity selector"}>
-      <Tooltip label={isDecrementDisabled ? (value <= min ? "Minimum quantity reached" : "Unavailable") : "Decrease quantity"}>
-        <IconButton
-          aria-label="Decrease quantity"
-          icon={<MinusIcon />}
-          size="sm"
-          variant="outline"
-          onClick={handleDecrement}
-          isDisabled={isDecrementDisabled}
-          borderColor={borderColor}
-          color={isDecrementDisabled ? neutralMedium : primaryColor}
-          _hover={{
-            borderColor: primaryColor,
-            backgroundColor: isDecrementDisabled ? 'transparent' : `${primaryColor}10`,
-          }}
-          _focus={{
-            boxShadow: `0 0 0 2px ${primaryColor}40`,
-          }}
-        />
-      </Tooltip>
+  const styles = StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+    },
+    button: {
+      width: 36,
+      height: 36,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.white,
+      padding: 0,
+    },
+    buttonDisabled: {
+      backgroundColor: colors.lightGrey,
+      borderColor: colors.border,
+    },
+    input: {
+      width: 60,
+      height: 36,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      textAlign: 'center',
+      fontSize: 16,
+      color: colors.text,
+      backgroundColor: colors.white,
+      paddingHorizontal: spacing.xs,
+    },
+    inputDisabled: {
+      backgroundColor: colors.lightGrey,
+      color: colors.midGrey,
+    },
+    soldOutText: {
+      fontSize: 14,
+      color: colors.danger,
+      marginLeft: spacing.sm,
+    },
+  });
 
-      <Input
-        value={inputValue}
-        onChange={handleInputChange}
-        onBlur={handleInputBlur}
-        size="sm"
-        width="60px"
-        textAlign="center"
-        borderColor={borderColor}
-        isDisabled={isDisabled}
-        aria-label="Ticket quantity"
-        min={min}
-        max={max}
-        type="number"
-        _focus={{
-          borderColor: primaryColor,
-          boxShadow: `0 0 0 1px ${primaryColor}`,
-        }}
-        _invalid={{
-          borderColor: errorColor,
-        }}
+  return (
+    <View style={styles.container}>
+      <Button
+        onPress={handleDecrement}
+        disabled={isDecrementDisabled}
+        buttonStyle={[
+          styles.button,
+          isDecrementDisabled && styles.buttonDisabled,
+        ]}
+        icon={
+          <Icon
+            name="minus"
+            type="material-community"
+            size={20}
+            color={isDecrementDisabled ? colors.midGrey : colors.primary}
+          />
+        }
       />
 
-      <Tooltip label={isIncrementDisabled ? (value >= max ? "Maximum quantity reached" : "Unavailable") : "Increase quantity"}>
-        <IconButton
-          aria-label="Increase quantity"
-          icon={<AddIcon />}
-          size="sm"
-          variant="outline"
-          onClick={handleIncrement}
-          isDisabled={isIncrementDisabled}
-          borderColor={borderColor}
-          color={isIncrementDisabled ? neutralMedium : primaryColor}
-          _hover={{
-            borderColor: primaryColor,
-            backgroundColor: isIncrementDisabled ? 'transparent' : `${primaryColor}10`,
-          }}
-          _focus={{
-            boxShadow: `0 0 0 2px ${primaryColor}40`,
-          }}
-        />
-      </Tooltip>
+      <TextInput
+        value={inputValue}
+        onChangeText={handleInputChange}
+        onBlur={handleInputBlur}
+        style={[
+          styles.input,
+          isDisabled && styles.inputDisabled,
+        ]}
+        editable={!isDisabled}
+        keyboardType="numeric"
+        accessibilityLabel={t('registration.ticketQuantity')}
+      />
+
+      <Button
+        onPress={handleIncrement}
+        disabled={isIncrementDisabled}
+        buttonStyle={[
+          styles.button,
+          isIncrementDisabled && styles.buttonDisabled,
+        ]}
+        icon={
+          <Icon
+            name="plus"
+            type="material-community"
+            size={20}
+            color={isIncrementDisabled ? colors.midGrey : colors.primary}
+          />
+        }
+      />
 
       {max <= 0 && (
-        <Text fontSize="sm" color={errorColor} ml={2}>
-          Sold Out
+        <Text style={styles.soldOutText}>
+          {t('registration.soldOut')}
         </Text>
       )}
-    </HStack>
+    </View>
   );
 };
 

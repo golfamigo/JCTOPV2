@@ -1,13 +1,7 @@
 import React from 'react';
-import {
-  Box,
-  HStack,
-  Circle,
-  Text,
-  VStack,
-  useColorModeValue,
-} from '@chakra-ui/react';
-import { CheckIcon } from '@chakra-ui/icons';
+import { View, StyleSheet, Dimensions } from 'react-native';
+import { Text, Icon } from '@rneui/themed';
+import { useAppTheme } from '@/theme';
 
 interface Step {
   title: string;
@@ -17,28 +11,15 @@ interface Step {
 interface StepIndicatorProps {
   steps: Step[];
   currentStep: number;
-  orientation?: 'horizontal' | 'vertical';
-  size?: 'sm' | 'md' | 'lg';
 }
 
 const StepIndicator: React.FC<StepIndicatorProps> = ({
   steps,
   currentStep,
-  orientation = 'horizontal',
-  size = 'md',
 }) => {
-  // Use actual colors from branding guide instead of theme tokens
-  const primaryColor = '#2563EB';
-  const neutralLight = '#F8FAFC';
-  const neutralMedium = '#64748B';
-  const neutralDark = '#0F172A';
-  
-  const completedColor = primaryColor;
-  const currentColor = primaryColor;
-  const incompleteColor = useColorModeValue(neutralMedium, '#94A3B8');
-  const completedBg = primaryColor;
-  const currentBg = useColorModeValue('white', neutralDark);
-  const incompleteBg = useColorModeValue(neutralLight, '#334155');
+  const { colors, spacing, typography } = useAppTheme();
+  const windowWidth = Dimensions.get('window').width;
+  const isTablet = windowWidth >= 768;
 
   const getStepStatus = (index: number): 'completed' | 'current' | 'incomplete' => {
     if (index < currentStep) return 'completed';
@@ -46,136 +27,177 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({
     return 'incomplete';
   };
 
-  const getCircleSize = () => {
-    switch (size) {
-      case 'sm': return '24px';
-      case 'lg': return '40px';
-      default: return '32px';
-    }
-  };
-
-  const getTextSize = () => {
-    switch (size) {
-      case 'sm': return 'sm';
-      case 'lg': return 'lg';
-      default: return 'md';
-    }
-  };
+  const styles = StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.sm,
+    },
+    stepContainer: {
+      alignItems: 'center',
+      flex: 1,
+      maxWidth: isTablet ? 150 : 100,
+    },
+    circleContainer: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.xs,
+    },
+    circleCompleted: {
+      backgroundColor: colors.primary,
+    },
+    circleCurrent: {
+      backgroundColor: colors.white,
+      borderWidth: 2,
+      borderColor: colors.primary,
+    },
+    circleIncomplete: {
+      backgroundColor: colors.lightGrey,
+    },
+    stepNumber: {
+      fontSize: 14,
+      fontWeight: 'bold',
+    },
+    stepNumberCompleted: {
+      color: colors.white,
+    },
+    stepNumberCurrent: {
+      color: colors.primary,
+    },
+    stepNumberIncomplete: {
+      color: colors.midGrey,
+    },
+    stepTitle: {
+      fontSize: isTablet ? 14 : 12,
+      textAlign: 'center',
+      marginBottom: spacing.xs,
+    },
+    stepTitleCompleted: {
+      color: colors.primary,
+      fontWeight: '600',
+    },
+    stepTitleCurrent: {
+      color: colors.primary,
+      fontWeight: 'bold',
+    },
+    stepTitleIncomplete: {
+      color: colors.midGrey,
+    },
+    stepDescription: {
+      fontSize: 10,
+      color: colors.midGrey,
+      textAlign: 'center',
+    },
+    connector: {
+      position: 'absolute',
+      top: 16,
+      height: 2,
+      backgroundColor: colors.border,
+    },
+    connectorCompleted: {
+      backgroundColor: colors.primary,
+    },
+    incompleteOpacity: {
+      opacity: 0.6,
+    },
+  });
 
   const renderStep = (step: Step, index: number) => {
     const status = getStepStatus(index);
     const isCompleted = status === 'completed';
     const isCurrent = status === 'current';
-    
+    const isIncomplete = status === 'incomplete';
+
     return (
-      <VStack
-        key={index}
-        spacing={2}
-        align="center"
-        opacity={status === 'incomplete' ? 0.6 : 1}
+      <View 
+        key={index} 
+        style={[
+          styles.stepContainer,
+          isIncomplete && styles.incompleteOpacity,
+        ]}
       >
-        <Circle
-          size={getCircleSize()}
-          bg={isCompleted ? completedBg : isCurrent ? currentBg : incompleteBg}
-          color={isCompleted ? 'white' : isCurrent ? currentColor : incompleteColor}
-          borderWidth={isCurrent ? '2px' : '0'}
-          borderColor={currentColor}
-          aria-label={`Step ${index + 1}: ${step.title}`}
-          role="img"
+        <View
+          style={[
+            styles.circleContainer,
+            isCompleted && styles.circleCompleted,
+            isCurrent && styles.circleCurrent,
+            isIncomplete && styles.circleIncomplete,
+          ]}
         >
           {isCompleted ? (
-            <CheckIcon boxSize={size === 'sm' ? '12px' : size === 'lg' ? '20px' : '16px'} />
+            <Icon
+              name="check"
+              type="material-community"
+              size={16}
+              color={colors.white}
+            />
           ) : (
             <Text
-              fontSize={size === 'sm' ? 'xs' : size === 'lg' ? 'md' : 'sm'}
-              fontWeight="bold"
+              style={[
+                styles.stepNumber,
+                isCompleted && styles.stepNumberCompleted,
+                isCurrent && styles.stepNumberCurrent,
+                isIncomplete && styles.stepNumberIncomplete,
+              ]}
             >
               {index + 1}
             </Text>
           )}
-        </Circle>
-        
-        <VStack spacing={1} align="center" maxW="120px">
-          <Text
-            fontSize={getTextSize()}
-            fontWeight={isCurrent ? 'bold' : 'medium'}
-            color={isCompleted || isCurrent ? currentColor : incompleteColor}
-            textAlign="center"
-            lineHeight="tight"
-          >
-            {step.title}
+        </View>
+
+        <Text
+          style={[
+            styles.stepTitle,
+            isCompleted && styles.stepTitleCompleted,
+            isCurrent && styles.stepTitleCurrent,
+            isIncomplete && styles.stepTitleIncomplete,
+          ]}
+          numberOfLines={2}
+        >
+          {step.title}
+        </Text>
+
+        {step.description && (
+          <Text style={styles.stepDescription} numberOfLines={2}>
+            {step.description}
           </Text>
-          {step.description && (
-            <Text
-              fontSize="xs"
-              color={incompleteColor}
-              textAlign="center"
-              lineHeight="tight"
-            >
-              {step.description}
-            </Text>
-          )}
-        </VStack>
-      </VStack>
+        )}
+      </View>
     );
   };
 
   const renderConnector = (index: number) => {
     if (index === steps.length - 1) return null;
-    
+
     const isCompleted = index < currentStep;
-    
+    const stepWidth = (windowWidth - spacing.md * 2) / steps.length;
+    const connectorWidth = stepWidth - 32;
+
     return (
-      <Box
+      <View
         key={`connector-${index}`}
-        flex="1"
-        height="2px"
-        bg={isCompleted ? completedColor : incompleteColor}
-        mx={2}
-        borderRadius="full"
-        aria-hidden="true"
+        style={[
+          styles.connector,
+          {
+            left: stepWidth * index + stepWidth / 2 + 16,
+            width: connectorWidth,
+          },
+          isCompleted && styles.connectorCompleted,
+        ]}
       />
     );
   };
 
-  if (orientation === 'vertical') {
-    return (
-      <VStack spacing={4} align="stretch">
-        {steps.map((step, index) => (
-          <HStack key={index} spacing={4} align="flex-start">
-            {renderStep(step, index)}
-            {index < steps.length - 1 && (
-              <Box
-                width="2px"
-                height="40px"
-                bg={index < currentStep ? completedColor : incompleteColor}
-                ml={4}
-                borderRadius="full"
-                aria-hidden="true"
-              />
-            )}
-          </HStack>
-        ))}
-      </VStack>
-    );
-  }
-
   return (
-    <HStack
-      spacing={0}
-      align="center"
-      width="full"
-      justify="space-between"
-      role="navigation"
-      aria-label="Progress steps"
-    >
-      {steps.map((step, index) => (
-        <React.Fragment key={index}>
-          {renderStep(step, index)}
-          {renderConnector(index)}
-        </React.Fragment>
-      ))}
-    </HStack>
+    <View style={styles.container}>
+      {steps.map((step, index) => renderStep(step, index))}
+      {steps.map((_, index) => renderConnector(index))}
+    </View>
   );
 };
 

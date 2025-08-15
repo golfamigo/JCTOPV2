@@ -18,10 +18,9 @@ class InvoiceService {
    */
   async getInvoiceSettings(eventId: string): Promise<InvoiceSettings | null> {
     try {
-      const response = await apiClient.get(`/events/${eventId}/invoice-settings`);
-      return response.data;
+      return await apiClient.get<InvoiceSettings>(`/events/${eventId}/invoice-settings`);
     } catch (error: any) {
-      if (error.response?.status === 404) {
+      if (error.message?.includes('404')) {
         return null;
       }
       throw error;
@@ -35,8 +34,7 @@ class InvoiceService {
     eventId: string, 
     settings: CreateInvoiceSettingsRequest
   ): Promise<InvoiceSettings> {
-    const response = await apiClient.post(`/events/${eventId}/invoice-settings`, settings);
-    return response.data;
+    return await apiClient.post<InvoiceSettings>(`/events/${eventId}/invoice-settings`, settings);
   }
 
   /**
@@ -46,8 +44,7 @@ class InvoiceService {
     eventId: string, 
     settings: UpdateInvoiceSettingsRequest
   ): Promise<InvoiceSettings> {
-    const response = await apiClient.put(`/events/${eventId}/invoice-settings`, settings);
-    return response.data;
+    return await apiClient.put<InvoiceSettings>(`/events/${eventId}/invoice-settings`, settings);
   }
 
   /**

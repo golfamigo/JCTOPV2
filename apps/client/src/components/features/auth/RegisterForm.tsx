@@ -1,70 +1,124 @@
 import React, { useState } from 'react';
-import {
-  Box,
-  VStack,
-  HStack,
-  Text,
-  Input,
-  Button,
-  FormControl,
-  FormLabel,
-  FormErrorMessage,
-  Heading,
-  useToast,
-  Spinner,
-} from '@chakra-ui/react';
-import { KeyboardAvoidingView, Platform } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { Text, Input, Button, CheckBox } from '@rneui/themed';
+import { Link } from 'expo-router';
+import { useTranslation } from '../../../localization';
+import { useAppTheme } from '@/theme';
+import PasswordStrengthIndicator from '../../molecules/PasswordStrengthIndicator';
+import { LoadingOverlay } from '../../organisms/LoadingOverlay';
+import { ErrorCard } from '../../molecules/ErrorCard';
+import { useNetworkStatus } from '../../../utils/networkStatus';
+
+/**
+ * Validation constants for form fields
+ */
+const VALIDATION_RULES = {
+  NAME: {
+    MIN_LENGTH: 2,
+    MAX_LENGTH: 50,
+  },
+  EMAIL: {
+    MAX_LENGTH: 100,
+    REGEX: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  },
+  PASSWORD: {
+    MIN_LENGTH: 8,
+    MAX_LENGTH: 50,
+    COMPLEXITY_REGEX: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,50}$/,
+  },
+} as const;
 
 interface RegisterData {
   name: string;
   email: string;
   password: string;
+  confirmPassword: string;
 }
 
-type RegisterFormProps = {
-  onRegister: (userData: RegisterData) => Promise<void>;
-};
+interface RegisterFormProps {
+  onRegister: (userData: Omit<RegisterData, 'confirmPassword'>) => Promise<void>;
+}
 
-const RegisterForm = ({ onRegister }: RegisterFormProps) => {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+interface FormErrors {
+  name?: string;
+  email?: string;
+  password?: string;
+  confirmPassword?: string;
+  terms?: string;
+}
+
+export const RegisterForm: React.FC<RegisterFormProps> = ({ onRegister }) => {
+  const { t } = useTranslation();
+  const { colors, spacing, typography } = useAppTheme();
+  const networkStatus = useNetworkStatus();
+  
+  const [formData, setFormData] = useState<RegisterData>({
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+  });
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<Partial<RegisterData>>({});
-  const toast = useToast();
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const validateForm = (): boolean => {
-    const newErrors: Partial<RegisterData> = {};
+    const newErrors: FormErrors = {};
 
-    if (!name.trim()) {
-      newErrors.name = 'Name is required';
-    } else if (name.trim().length < 2) {
-      newErrors.name = 'Name must be at least 2 characters long';
-    } else if (name.trim().length > 50) {
-      newErrors.name = 'Name must not exceed 50 characters';
+    // Name validation
+    const trimmedName = formData.name.trim();
+    if (!trimmedName) {
+      newErrors.name = t('validation.required');
+    } else if (trimmedName.length < VALIDATION_RULES.NAME.MIN_LENGTH) {
+      newErrors.name = t('auth.nameTooShort');
+    } else if (trimmedName.length > VALIDATION_RULES.NAME.MAX_LENGTH) {
+      newErrors.name = t('auth.nameTooLong');
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!emailRegex.test(email)) {
-      newErrors.email = 'Please provide a valid email address';
-    } else if (email.length > 100) {
-      newErrors.email = 'Email must not exceed 100 characters';
+    // Email validation
+    const trimmedEmail = formData.email.trim();
+    if (!trimmedEmail) {
+      newErrors.email = t('validation.required');
+    } else if (!VALIDATION_RULES.EMAIL.REGEX.test(trimmedEmail)) {
+      newErrors.email = t('validation.invalidEmail');
+    } else if (trimmedEmail.length > VALIDATION_RULES.EMAIL.MAX_LENGTH) {
+      newErrors.email = t('auth.emailTooLong');
     }
 
-    if (!password) {
-      newErrors.password = 'Password is required';
-    } else if (password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters long';
-    } else if (password.length > 50) {
-      newErrors.password = 'Password must not exceed 50 characters';
-    } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,50}$/.test(password)) {
-      newErrors.password = 'Password must contain at least one uppercase letter, one lowercase letter, one number, and be 8-50 characters long';
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = t('validation.required');
+    } else if (formData.password.length < VALIDATION_RULES.PASSWORD.MIN_LENGTH) {
+      newErrors.password = t('validation.passwordTooShort');
+    } else if (formData.password.length > VALIDATION_RULES.PASSWORD.MAX_LENGTH) {
+      newErrors.password = t('auth.passwordTooLong');
+    } else if (!VALIDATION_RULES.PASSWORD.COMPLEXITY_REGEX.test(formData.password)) {
+      newErrors.password = t('auth.passwordComplexity');
+    }
+
+    // Confirm password validation
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = t('validation.required');
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = t('validation.passwordsDoNotMatch');
+    }
+
+    // Terms acceptance validation
+    if (!termsAccepted) {
+      newErrors.terms = t('validation.required');
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handleInputChange = (field: keyof RegisterData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: undefined }));
+    }
   };
 
   const handleSubmit = async () => {
@@ -72,224 +126,347 @@ const RegisterForm = ({ onRegister }: RegisterFormProps) => {
       return;
     }
 
+    if (!networkStatus.isConnected) {
+      setSubmitError(t('errors.offline'));
+      return;
+    }
+
     setIsLoading(true);
+    setSubmitError(null);
     try {
-      await onRegister({ name, email, password });
-      toast({
-        title: 'Registration Successful',
-        description: 'Your account has been created successfully.',
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
-        position: 'top',
-      });
+      const { confirmPassword, ...userData } = formData;
+      await onRegister(userData);
     } catch (error) {
-      toast({
-        title: 'Registration Failed',
-        description: error instanceof Error ? error.message : 'An error occurred during registration.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-        position: 'top',
-      });
+      setSubmitError(error instanceof Error ? error.message : t('messages.somethingWentWrong'));
     } finally {
       setIsLoading(false);
     }
   };
 
+  const styles = createStyles(colors, spacing, typography);
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ flex: 1 }}
+      style={styles.container}
+      testID="register-form-container"
     >
-      <Box
-        flex={1}
-        bg="neutral.50"
-        px={5}
-        py={10}
-        justifyContent="center"
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <VStack spacing={8} mx="auto" w="full" maxW="md">
-          {/* Title following UIUX typography scale */}
-          <Heading
-            size="xl"
-            fontSize="36px"
-            fontWeight="bold"
-            color="neutral.900"
-            textAlign="center"
-            lineHeight={1.2}
-            fontFamily="Inter"
-          >
-            Create Account
-          </Heading>
+        <View style={styles.formContainer}>
+          {/* Title */}
+          <Text h1 style={styles.title} testID="register-form-title">
+            {t('auth.createAccount')}
+          </Text>
 
-          <VStack spacing={6}>
-            {/* Name Field with WCAG compliance */}
-            <FormControl isInvalid={!!errors.name} isRequired>
-              <FormLabel
-                fontSize="16px"
-                fontWeight="600"
-                color="neutral.900"
-                mb={2}
-                fontFamily="Inter"
-              >
-                Name
-              </FormLabel>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Enter your name"
-                autoCapitalize="words"
-                autoCorrect="off"
-                bg="white"
-                borderColor={errors.name ? "error.500" : "neutral.200"}
-                borderWidth={1}
-                borderRadius={8}
-                fontSize="16px"
-                px={4}
-                py={3}
-                minH={12}
-                _focus={{
-                  borderColor: "primary.500",
-                  bg: "white"
-                }}
-                _invalid={{
-                  borderColor: "error.500"
-                }}
-                aria-label="Name input field"
-              />
-              <FormErrorMessage
-                fontSize="14px"
-                color="error.500"
-                mt={1}
-              >
-                {errors.name}
-              </FormErrorMessage>
-            </FormControl>
+          {/* Name Field */}
+          <View style={styles.inputContainer}>
+            <Input
+              label={t('auth.name')}
+              value={formData.name}
+              onChangeText={(value) => handleInputChange('name', value)}
+              placeholder={t('auth.enterName')}
+              autoCapitalize="words"
+              autoCorrect={false}
+              errorMessage={errors.name}
+              containerStyle={styles.inputWrapper}
+              inputContainerStyle={[
+                styles.inputField,
+                errors.name ? styles.inputError : undefined
+              ]}
+              labelStyle={styles.inputLabel}
+              inputStyle={styles.inputText}
+              errorStyle={styles.errorText}
+              testID="register-form-name-input"
+            />
+          </View>
 
-            {/* Email Field with WCAG compliance */}
-            <FormControl isInvalid={!!errors.email} isRequired>
-              <FormLabel
-                fontSize="16px"
-                fontWeight="600"
-                color="neutral.900"
-                mb={2}
-                fontFamily="Inter"
-              >
-                Email
-              </FormLabel>
-              <Input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                type="email"
-                autoCapitalize="none"
-                autoCorrect="off"
-                bg="white"
-                borderColor={errors.email ? "error.500" : "neutral.200"}
-                borderWidth={1}
-                borderRadius={8}
-                fontSize="16px"
-                px={4}
-                py={3}
-                minH={12}
-                _focus={{
-                  borderColor: "primary.500",
-                  bg: "white"
-                }}
-                _invalid={{
-                  borderColor: "error.500"
-                }}
-                aria-label="Email input field"
-              />
-              <FormErrorMessage
-                fontSize="14px"
-                color="error.500"
-                mt={1}
-              >
-                {errors.email}
-              </FormErrorMessage>
-            </FormControl>
+          {/* Email Field */}
+          <View style={styles.inputContainer}>
+            <Input
+              label={t('auth.email')}
+              value={formData.email}
+              onChangeText={(value) => handleInputChange('email', value)}
+              placeholder={t('auth.enterEmail')}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              errorMessage={errors.email}
+              containerStyle={styles.inputWrapper}
+              inputContainerStyle={[
+                styles.inputField,
+                errors.email ? styles.inputError : undefined
+              ]}
+              labelStyle={styles.inputLabel}
+              inputStyle={styles.inputText}
+              errorStyle={styles.errorText}
+              testID="register-form-email-input"
+            />
+          </View>
 
-            {/* Password Field with WCAG compliance */}
-            <FormControl isInvalid={!!errors.password} isRequired>
-              <FormLabel
-                fontSize="16px"
-                fontWeight="600"
-                color="neutral.900"
-                mb={2}
-                fontFamily="Inter"
-              >
-                Password
-              </FormLabel>
-              <Input
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                type="password"
-                autoCapitalize="none"
-                autoCorrect="off"
-                bg="white"
-                borderColor={errors.password ? "error.500" : "neutral.200"}
-                borderWidth={1}
-                borderRadius={8}
-                fontSize="16px"
-                px={4}
-                py={3}
-                minH={12}
-                _focus={{
-                  borderColor: "primary.500",
-                  bg: "white"
-                }}
-                _invalid={{
-                  borderColor: "error.500"
-                }}
-                aria-label="Password input field"
-              />
-              <FormErrorMessage
-                fontSize="14px"
-                color="error.500"
-                mt={1}
-              >
-                {errors.password}
-              </FormErrorMessage>
-            </FormControl>
+          {/* Password Field */}
+          <View style={styles.inputContainer}>
+            <Input
+              label={t('auth.password')}
+              value={formData.password}
+              onChangeText={(value) => handleInputChange('password', value)}
+              placeholder={t('auth.enterPassword')}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              errorMessage={errors.password}
+              containerStyle={styles.inputWrapper}
+              inputContainerStyle={[
+                styles.inputField,
+                errors.password ? styles.inputError : undefined
+              ]}
+              labelStyle={styles.inputLabel}
+              inputStyle={styles.inputText}
+              errorStyle={styles.errorText}
+              testID="register-form-password-input"
+            />
+            <PasswordStrengthIndicator 
+              password={formData.password}
+              testID="register-form-password-strength"
+            />
+          </View>
 
-            {/* Submit Button following brand colors and 4px grid */}
-            <Button
-              onClick={handleSubmit}
-              isDisabled={isLoading}
-              isLoading={isLoading}
-              loadingText="Registering..."
-              colorScheme="primary"
-              bg="primary.500"
-              _hover={{ bg: "primary.600" }}
-              _pressed={{ bg: "primary.700" }}
-              _disabled={{ bg: "neutral.300" }}
-              size="lg"
-              fontSize="18px"
-              fontWeight="bold"
-              borderRadius={8}
-              minH={12}
-              mt={4}
-              aria-label="Register button"
-            >
-              {isLoading ? (
-                <HStack spacing={2} alignItems="center">
-                  <Spinner size="sm" color="white" />
-                  <Text color="white" fontSize="18px" fontWeight="bold">
-                    Registering...
+          {/* Confirm Password Field */}
+          <View style={styles.inputContainer}>
+            <Input
+              label={t('auth.confirmPassword')}
+              value={formData.confirmPassword}
+              onChangeText={(value) => handleInputChange('confirmPassword', value)}
+              placeholder={t('auth.enterConfirmPassword')}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              errorMessage={errors.confirmPassword}
+              containerStyle={styles.inputWrapper}
+              inputContainerStyle={[
+                styles.inputField,
+                errors.confirmPassword ? styles.inputError : undefined
+              ]}
+              labelStyle={styles.inputLabel}
+              inputStyle={styles.inputText}
+              errorStyle={styles.errorText}
+              testID="register-form-confirm-password-input"
+            />
+          </View>
+
+          {/* Terms and Conditions Checkbox */}
+          <View style={styles.checkboxContainer}>
+            <CheckBox
+              title={
+                <View style={styles.termsTextContainer}>
+                  <Text style={styles.termsText}>
+                    {t('auth.agreeToTerms')}
                   </Text>
-                </HStack>
-              ) : (
-                'Register'
-              )}
-            </Button>
-          </VStack>
-        </VStack>
-      </Box>
+                  <Link href="/terms" asChild>
+                    <Text style={styles.termsLink}>
+                      {t('auth.termsAndConditions')}
+                    </Text>
+                  </Link>
+                </View>
+              }
+              checked={termsAccepted}
+              onPress={() => {
+                setTermsAccepted(!termsAccepted);
+                if (errors.terms) {
+                  setErrors(prev => ({ ...prev, terms: undefined }));
+                }
+              }}
+              containerStyle={styles.checkbox}
+              textStyle={styles.checkboxText}
+              checkedColor={colors.primary}
+              testID="register-form-terms-checkbox"
+            />
+            {errors.terms && (
+              <Text style={styles.errorText}>{errors.terms}</Text>
+            )}
+          </View>
+
+          {/* Error Display */}
+          {submitError && (
+            <ErrorCard
+              message={submitError}
+              errorType={!networkStatus.isConnected ? 'network' : 'generic'}
+              onDismiss={() => setSubmitError(null)}
+              containerStyle={{ marginBottom: spacing.md }}
+            />
+          )}
+
+          {/* Submit Button */}
+          <Button
+            title={isLoading ? t('auth.registering') : t('common.register')}
+            onPress={handleSubmit}
+            loading={isLoading}
+            disabled={isLoading}
+            buttonStyle={[
+              styles.submitButton,
+              isLoading && styles.submitButtonDisabled
+            ]}
+            titleStyle={styles.submitButtonText}
+            loadingProps={{
+              color: colors.white,
+            }}
+            testID="register-form-submit-button"
+          />
+
+          {/* Navigation Link */}
+          <View style={styles.navigationContainer}>
+            <Text style={styles.navigationText}>
+              {t('auth.alreadyHaveAccount')}
+            </Text>
+            <Link href="/auth/login" asChild>
+              <Text style={styles.navigationLink}>
+                {t('auth.signIn')}
+              </Text>
+            </Link>
+          </View>
+        </View>
+      </ScrollView>
+      <LoadingOverlay
+        visible={isLoading}
+        message={t('auth.registering')}
+        variant="spinner"
+      />
     </KeyboardAvoidingView>
   );
 };
+
+const createStyles = (colors: any, spacing: any, typography: any) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.xl,
+    },
+    formContainer: {
+      width: '100%',
+      maxWidth: 400,
+      alignSelf: 'center',
+    },
+    title: {
+      textAlign: 'center',
+      marginBottom: spacing.xl,
+      color: colors.text,
+      ...typography.h1,
+    },
+    inputContainer: {
+      marginBottom: spacing.md,
+    },
+    inputWrapper: {
+      paddingHorizontal: 0,
+    },
+    inputField: {
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      borderRadius: 8,
+      backgroundColor: colors.white,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      marginTop: spacing.xs,
+    },
+    inputError: {
+      borderBottomColor: colors.danger,
+      borderBottomWidth: 2,
+    },
+    inputLabel: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: spacing.xs,
+    },
+    inputText: {
+      fontSize: 16,
+      color: colors.text,
+    },
+    errorText: {
+      fontSize: 12,
+      color: colors.danger,
+      marginTop: spacing.xs,
+    },
+    checkboxContainer: {
+      marginVertical: spacing.md,
+    },
+    checkbox: {
+      backgroundColor: 'transparent',
+      borderWidth: 0,
+      paddingHorizontal: 0,
+      marginLeft: 0,
+      marginRight: 0,
+    },
+    checkboxText: {
+      fontSize: 16,
+      fontWeight: 'normal',
+      color: colors.text,
+      marginLeft: spacing.sm,
+    },
+    termsTextContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      marginLeft: spacing.sm,
+    },
+    termsText: {
+      fontSize: 16,
+      color: colors.text,
+      marginRight: spacing.xs,
+    },
+    termsLink: {
+      fontSize: 16,
+      color: colors.primary,
+      textDecorationLine: 'underline',
+    },
+    submitButton: {
+      backgroundColor: colors.primary,
+      borderRadius: 8,
+      paddingVertical: spacing.md,
+      marginTop: spacing.lg,
+      elevation: 2,
+      shadowColor: colors.dark,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+    },
+    submitButtonDisabled: {
+      backgroundColor: colors.disabled,
+    },
+    submitButtonText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.white,
+    },
+    navigationContainer: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: spacing.lg,
+      flexWrap: 'wrap',
+    },
+    navigationText: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      marginRight: spacing.xs,
+    },
+    navigationLink: {
+      fontSize: 16,
+      color: colors.primary,
+      fontWeight: '600',
+    },
+  });
 
 export default RegisterForm;

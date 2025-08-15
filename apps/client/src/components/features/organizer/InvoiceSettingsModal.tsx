@@ -1,32 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
-  ModalBody,
-  ModalCloseButton,
-  Button,
-  VStack,
-  FormControl,
-  FormLabel,
-  Input,
-  Textarea,
-  useToast,
+  View,
+  ScrollView,
   Alert,
-  AlertIcon,
-  Divider,
+} from 'react-native';
+import {
+  Button,
+  Input,
   Text,
-  HStack,
-  Box,
+  Overlay,
   Card,
-  CardBody,
-  Heading,
-} from '@chakra-ui/react';
+  Divider,
+} from '@rneui/themed';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { InvoiceSettings } from '@jctop-event/shared-types';
 import { useReportStore } from '../../../stores/reportStore';
 import invoiceService, { CreateInvoiceSettingsRequest } from '../../../services/invoiceService';
+import { useAppTheme } from '@/theme';
 
 interface InvoiceSettingsModalProps {
   isOpen: boolean;
@@ -41,7 +32,8 @@ export const InvoiceSettingsModal: React.FC<InvoiceSettingsModalProps> = ({
   eventId,
   eventTitle,
 }) => {
-  const toast = useToast();
+  const { t } = useTranslation();
+  const { colors, spacing } = useAppTheme();
   const {
     invoiceSettings,
     invoiceSettingsLoading,
@@ -117,24 +109,18 @@ export const InvoiceSettingsModal: React.FC<InvoiceSettingsModalProps> = ({
       
       setInvoiceSettings(savedSettings);
       
-      toast({
-        title: 'Settings Saved',
-        description: 'Invoice settings have been updated successfully',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
+      Alert.alert(
+        t('invoice.settingsUpdated'),
+        t('invoice.settingsUpdateSuccess')
+      );
 
       onClose();
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || 'Failed to save invoice settings';
-      toast({
-        title: 'Save Failed',
-        description: errorMessage,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      Alert.alert(
+        t('common.error'),
+        errorMessage
+      );
     } finally {
       setIsSaving(false);
     }
@@ -157,24 +143,18 @@ export const InvoiceSettingsModal: React.FC<InvoiceSettingsModalProps> = ({
         customFields: {},
       });
 
-      toast({
-        title: 'Settings Deleted',
-        description: 'Invoice settings have been deleted',
-        status: 'info',
-        duration: 3000,
-        isClosable: true,
-      });
+      Alert.alert(
+        t('invoice.deleteSuccess'),
+        t('invoice.settingsDeleted')
+      );
 
       onClose();
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || 'Failed to delete invoice settings';
-      toast({
-        title: 'Delete Failed',
-        description: errorMessage,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      Alert.alert(
+        t('common.error'),
+        errorMessage
+      );
     } finally {
       setIsSaving(false);
     }
@@ -185,20 +165,51 @@ export const InvoiceSettingsModal: React.FC<InvoiceSettingsModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="xl">
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader>
-          Invoice Settings - {eventTitle}
-        </ModalHeader>
-        <ModalCloseButton />
+    <Overlay isVisible={isOpen} onBackdropPress={onClose} overlayStyle={{
+      width: '90%',
+      maxWidth: 500,
+      height: '80%',
+      borderRadius: 12,
+      padding: 0,
+    }}>
+      <View style={{ flex: 1, backgroundColor: colors.white }}>
+        {/* Header */}
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: spacing.lg,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.greyOutline,
+        }}>
+          <Text h4>{t('invoice.invoiceSettings')} - {eventTitle}</Text>
+          <Button
+            onPress={onClose}
+            type="clear"
+            icon={<MaterialCommunityIcons name="close" size={24} color={colors.grey2} />}
+          />
+        </View>
         
-        <ModalBody>
+        <ScrollView style={{ flex: 1, padding: spacing.lg }}>
           {invoiceSettingsError && (
-            <Alert status="error" mb={4}>
-              <AlertIcon />
-              {invoiceSettingsError}
-            </Alert>
+            <Card containerStyle={{
+              backgroundColor: colors.danger + '20',
+              borderColor: colors.danger,
+              borderWidth: 1,
+              marginBottom: spacing.md,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <MaterialCommunityIcons 
+                  name="alert-circle" 
+                  size={24} 
+                  color={colors.danger} 
+                  style={{ marginRight: spacing.sm }}
+                />
+                <Text style={{ color: colors.error, flex: 1 }}>
+                  {invoiceSettingsError}
+                </Text>
+              </View>
+            </Card>
           )}
 
           {previewMode ? (
@@ -208,99 +219,113 @@ export const InvoiceSettingsModal: React.FC<InvoiceSettingsModalProps> = ({
               onBackToEdit={() => setPreviewMode(false)}
             />
           ) : (
-            <VStack spacing={4} align="stretch">
-              <FormControl>
-                <FormLabel>Company Name</FormLabel>
-                <Input
-                  value={formData.companyName}
-                  onChange={(e) => handleInputChange('companyName', e.target.value)}
-                  placeholder="Enter your company name"
-                />
-              </FormControl>
+            <View>
+              <Input
+                label={t('invoice.companyName')}
+                value={formData.companyName}
+                onChangeText={(text) => handleInputChange('companyName', text)}
+                placeholder={t('invoice.enterCompanyName')}
+                containerStyle={{ marginBottom: spacing.md }}
+              />
 
-              <FormControl>
-                <FormLabel>Company Address</FormLabel>
-                <Textarea
-                  value={formData.companyAddress}
-                  onChange={(e) => handleInputChange('companyAddress', e.target.value)}
-                  placeholder="Enter your company address"
-                  rows={3}
-                />
-              </FormControl>
+              <Input
+                label={t('invoice.companyAddress')}
+                value={formData.companyAddress}
+                onChangeText={(text) => handleInputChange('companyAddress', text)}
+                placeholder={t('invoice.enterCompanyAddress')}
+                multiline
+                numberOfLines={3}
+                containerStyle={{ marginBottom: spacing.md }}
+              />
 
-              <FormControl>
-                <FormLabel>Tax Number / VAT ID</FormLabel>
-                <Input
-                  value={formData.taxNumber}
-                  onChange={(e) => handleInputChange('taxNumber', e.target.value)}
-                  placeholder="Enter tax number or VAT ID"
-                />
-              </FormControl>
+              <Input
+                label={t('invoice.taxNumber')}
+                value={formData.taxNumber}
+                onChangeText={(text) => handleInputChange('taxNumber', text)}
+                placeholder={t('invoice.enterTaxNumber')}
+                containerStyle={{ marginBottom: spacing.md }}
+              />
 
-              <FormControl>
-                <FormLabel>Invoice Prefix</FormLabel>
-                <Input
-                  value={formData.invoicePrefix}
-                  onChange={(e) => handleInputChange('invoicePrefix', e.target.value)}
-                  placeholder="e.g., INV-, EVENT-"
-                />
-              </FormControl>
+              <Input
+                label={t('invoice.invoicePrefix')}
+                value={formData.invoicePrefix}
+                onChangeText={(text) => handleInputChange('invoicePrefix', text)}
+                placeholder="e.g., INV-, EVENT-"
+                containerStyle={{ marginBottom: spacing.md }}
+              />
 
-              <FormControl>
-                <FormLabel>Invoice Footer</FormLabel>
-                <Textarea
-                  value={formData.invoiceFooter}
-                  onChange={(e) => handleInputChange('invoiceFooter', e.target.value)}
-                  placeholder="Additional terms, payment instructions, etc."
-                  rows={3}
-                />
-              </FormControl>
+              <Input
+                label={t('invoice.invoiceFooter')}
+                value={formData.invoiceFooter}
+                onChangeText={(text) => handleInputChange('invoiceFooter', text)}
+                placeholder={t('invoice.enterFooter')}
+                multiline
+                numberOfLines={3}
+                containerStyle={{ marginBottom: spacing.md }}
+              />
 
-              <Divider />
+              <Divider style={{ marginVertical: spacing.md }} />
 
-              <Box>
-                <Button
-                  variant="outline"
-                  onClick={togglePreview}
-                  w="full"
-                  isDisabled={!formData.companyName}
-                >
-                  Preview Invoice Template
-                </Button>
-              </Box>
-            </VStack>
+              <Button
+                title={t('invoice.previewTemplate')}
+                type="outline"
+                onPress={togglePreview}
+                disabled={!formData.companyName}
+                containerStyle={{ marginBottom: spacing.md }}
+              />
+            </View>
           )}
-        </ModalBody>
-
-        <ModalFooter>
-          <HStack spacing={3}>
-            {invoiceSettings && !previewMode && (
-              <Button
-                colorScheme="red"
-                variant="outline"
-                onClick={handleDelete}
-                isLoading={isSaving}
-              >
-                Delete
-              </Button>
-            )}
-            <Button variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            {!previewMode && (
-              <Button
-                colorScheme="primary"
-                onClick={handleSave}
-                isLoading={isSaving || invoiceSettingsLoading}
-                isDisabled={!formData.companyName}
-              >
-                {invoiceSettings ? 'Update' : 'Create'} Settings
-              </Button>
-            )}
-          </HStack>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
+        </ScrollView>
+        
+        {/* Footer */}
+        <View style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          padding: spacing.lg,
+          borderTopWidth: 1,
+          borderTopColor: colors.greyOutline,
+        }}>
+          {invoiceSettings && !previewMode && (
+            <Button
+              title={t('common.delete')}
+              type="outline"
+              buttonStyle={{ borderColor: colors.danger }}
+              titleStyle={{ color: colors.danger }}
+              onPress={() => {
+                Alert.alert(
+                  t('invoice.confirmDelete'),
+                  t('invoice.confirmDeleteMessage'),
+                  [
+                    { text: t('common.cancel'), style: 'cancel' },
+                    { text: t('common.delete'), style: 'destructive', onPress: handleDelete },
+                  ]
+                );
+              }}
+              loading={isSaving}
+              containerStyle={{ flex: 1, marginRight: spacing.sm }}
+            />
+          )}
+          <Button
+            title={t('common.cancel')}
+            type="clear"
+            onPress={onClose}
+            containerStyle={{ 
+              flex: invoiceSettings && !previewMode ? 1 : 0,
+              marginHorizontal: spacing.sm 
+            }}
+          />
+          {!previewMode && (
+            <Button
+              title={invoiceSettings ? t('common.update') : t('common.create')}
+              onPress={handleSave}
+              loading={isSaving || invoiceSettingsLoading}
+              disabled={!formData.companyName}
+              containerStyle={{ flex: 1, marginLeft: spacing.sm }}
+            />
+          )}
+        </View>
+      </View>
+    </Overlay>
   );
 };
 
@@ -315,73 +340,109 @@ const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   eventTitle,
   onBackToEdit,
 }) => {
+  const { t } = useTranslation();
+  const { colors, spacing } = useAppTheme();
+  
   return (
-    <VStack spacing={4} align="stretch">
-      <HStack justify="space-between">
-        <Heading size="md">Invoice Preview</Heading>
-        <Button size="sm" onClick={onBackToEdit}>
-          Back to Edit
-        </Button>
-      </HStack>
+    <View>
+      <View style={{
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.md,
+      }}>
+        <Text h3>{t('invoice.invoicePreview')}</Text>
+        <Button
+          title={t('common.backToEdit')}
+          type="clear"
+          onPress={onBackToEdit}
+          titleStyle={{ fontSize: 14 }}
+        />
+      </View>
 
       <Card>
-        <CardBody>
-          <VStack spacing={4} align="stretch">
-            {/* Header */}
-            <Box borderBottom="2px" borderColor="gray.200" pb={4}>
-              <Text fontSize="2xl" fontWeight="bold">INVOICE</Text>
-              <Text color="gray.600">
-                {formData.invoicePrefix || 'INV-'}001
+        <View>
+          {/* Header */}
+          <View style={{
+            borderBottomWidth: 2,
+            borderBottomColor: colors.greyOutline,
+            paddingBottom: spacing.md,
+            marginBottom: spacing.md,
+          }}>
+            <Text style={{ fontSize: 24, fontWeight: 'bold' }}>INVOICE</Text>
+            <Text style={{ color: colors.grey2 }}>
+              {formData.invoicePrefix || 'INV-'}001
+            </Text>
+          </View>
+
+          {/* Company Info */}
+          <View style={{ marginBottom: spacing.md }}>
+            <Text style={{ fontSize: 18, fontWeight: '600' }}>
+              {formData.companyName || 'Your Company Name'}
+            </Text>
+            {formData.companyAddress && (
+              <Text style={{ color: colors.grey2, marginTop: spacing.xs }}>
+                {formData.companyAddress}
               </Text>
-            </Box>
-
-            {/* Company Info */}
-            <Box>
-              <Text fontSize="lg" fontWeight="semibold">
-                {formData.companyName || 'Your Company Name'}
-              </Text>
-              {formData.companyAddress && (
-                <Text whiteSpace="pre-line" color="gray.600">
-                  {formData.companyAddress}
-                </Text>
-              )}
-              {formData.taxNumber && (
-                <Text color="gray.600">Tax ID: {formData.taxNumber}</Text>
-              )}
-            </Box>
-
-            {/* Event Info */}
-            <Box>
-              <Text fontWeight="semibold">Event:</Text>
-              <Text>{eventTitle}</Text>
-            </Box>
-
-            {/* Sample Invoice Items */}
-            <Box>
-              <Text fontWeight="semibold" mb={2}>Invoice Details:</Text>
-              <Box bg="gray.50" p={3} borderRadius="md">
-                <HStack justify="space-between">
-                  <Text>Event Registration - General Admission</Text>
-                  <Text fontWeight="semibold">$50.00</Text>
-                </HStack>
-                <HStack justify="space-between" mt={2} pt={2} borderTop="1px" borderColor="gray.200">
-                  <Text fontWeight="bold">Total:</Text>
-                  <Text fontWeight="bold">$50.00</Text>
-                </HStack>
-              </Box>
-            </Box>
-
-            {/* Footer */}
-            {formData.invoiceFooter && (
-              <Box borderTop="1px" borderColor="gray.200" pt={4}>
-                <Text fontSize="sm" color="gray.600" whiteSpace="pre-line">
-                  {formData.invoiceFooter}
-                </Text>
-              </Box>
             )}
-          </VStack>
-        </CardBody>
+            {formData.taxNumber && (
+              <Text style={{ color: colors.grey2, marginTop: spacing.xs }}>
+                Tax ID: {formData.taxNumber}
+              </Text>
+            )}
+          </View>
+
+          {/* Event Info */}
+          <View style={{ marginBottom: spacing.md }}>
+            <Text style={{ fontWeight: '600' }}>Event:</Text>
+            <Text>{eventTitle}</Text>
+          </View>
+
+          {/* Sample Invoice Items */}
+          <View style={{ marginBottom: spacing.md }}>
+            <Text style={{ fontWeight: '600', marginBottom: spacing.sm }}>Invoice Details:</Text>
+            <View style={{
+              backgroundColor: colors.grey0,
+              padding: spacing.md,
+              borderRadius: 8,
+            }}>
+              <View style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}>
+                <Text>Event Registration - General Admission</Text>
+                <Text style={{ fontWeight: '600' }}>$50.00</Text>
+              </View>
+              <View style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: spacing.sm,
+                paddingTop: spacing.sm,
+                borderTopWidth: 1,
+                borderTopColor: colors.greyOutline,
+              }}>
+                <Text style={{ fontWeight: 'bold' }}>Total:</Text>
+                <Text style={{ fontWeight: 'bold' }}>$50.00</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Footer */}
+          {formData.invoiceFooter && (
+            <View style={{
+              borderTopWidth: 1,
+              borderTopColor: colors.greyOutline,
+              paddingTop: spacing.md,
+            }}>
+              <Text style={{ fontSize: 12, color: colors.grey2 }}>
+                {formData.invoiceFooter}
+              </Text>
+            </View>
+          )}
+        </View>
       </Card>
-    </VStack>
+    </View>
   );
 };

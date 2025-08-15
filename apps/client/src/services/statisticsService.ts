@@ -1,5 +1,5 @@
 // Use environment variable or fallback to production URL
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://jctop.zeabur.app/api/v1';
+const API_BASE_URL = process?.env?.EXPO_PUBLIC_API_URL || 'https://jctop.zeabur.app/api/v1';
 
 export interface EventStatistics {
   eventId: string;

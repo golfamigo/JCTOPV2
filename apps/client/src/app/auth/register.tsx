@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import RegisterForm from '../../components/features/auth/RegisterForm';
 import { useAuthStore } from '../../stores/authStore';
 import authService from '../../services/authService';
+import { useAppTheme } from '@/theme';
 
 /**
  * Register Page Component
@@ -24,6 +25,7 @@ import authService from '../../services/authService';
 export default function RegisterPage() {
   const router = useRouter();
   const { isAuthenticated, login } = useAuthStore();
+  const { colors, spacing } = useAppTheme();
 
   // Handle registration request
   const handleRegister = async (userData: { name: string; email: string; password: string }) => {
@@ -54,6 +56,8 @@ export default function RegisterPage() {
     return null; // Will redirect via useEffect
   }
 
+  const styles = createStyles(colors, spacing);
+
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
@@ -71,18 +75,19 @@ export default function RegisterPage() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 24,
-    paddingTop: 60, // Account for status bar
-  },
-});
+const createStyles = (colors: any, spacing: any) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.lightGrey,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      padding: spacing.lg,
+      paddingTop: 60, // Account for status bar
+    },
+  });

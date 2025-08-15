@@ -1,30 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  VStack,
-  HStack,
-  Button,
-  Text,
-  Heading,
-  Alert,
-  AlertIcon,
-  AlertDescription,
-  useColorModeValue,
-  Container,
-  Card,
-  CardBody,
-  useToast,
-  Divider,
-  SimpleGrid,
-  Spinner,
-  Center,
-} from '@chakra-ui/react';
-import { ArrowBackIcon, ArrowForwardIcon } from '@chakra-ui/icons';
-import { Event, TicketSelection, CustomRegistrationField, RegistrationFormData, DiscountValidationResponse } from '@jctop-event/shared-types';
+import { ScrollView, View, StyleSheet, Alert, Dimensions, ActivityIndicator } from 'react-native';
+import { Card, Text, Button, Divider, Input, Icon } from '@rneui/themed';
+import { useTranslation } from 'react-i18next';
+import { 
+  Event, 
+  TicketSelection, 
+  CustomRegistrationField, 
+  RegistrationFormData, 
+  DiscountValidationResponse 
+} from '@jctop-event/shared-types';
 import StepIndicator from '../../common/StepIndicator';
 import DynamicFieldRenderer from './DynamicFieldRenderer';
 import DiscountCodeInput from './DiscountCodeInput';
 import registrationService from '../../../services/registrationService';
+import { useAppTheme } from '@/theme';
 
 interface RegistrationStepTwoProps {
   event: Event;
@@ -47,6 +36,8 @@ const RegistrationStepTwo: React.FC<RegistrationStepTwoProps> = ({
   initialFormData = {},
   isLoading = false,
 }) => {
+  const { t } = useTranslation();
+  const { colors, spacing, typography } = useAppTheme();
   const [customFields, setCustomFields] = useState<CustomRegistrationField[]>([]);
   const [fieldValues, setFieldValues] = useState<Record<string, any>>({});
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -55,26 +46,20 @@ const RegistrationStepTwo: React.FC<RegistrationStepTwoProps> = ({
   const [appliedDiscountCode, setAppliedDiscountCode] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingError, setLoadingError] = useState<string | null>(null);
-  const toast = useToast();
 
-  // Design system colors following branding guide
-  const cardBgColor = useColorModeValue('white', '#1E293B');
-  const primaryColor = '#2563EB';
-  const borderColor = useColorModeValue('#E2E8F0', '#475569');
-  const neutralLight = '#F8FAFC';
-  const neutralMedium = '#64748B';
-  const errorColor = '#EF4444';
+  const windowWidth = Dimensions.get('window').width;
+  const isTablet = windowWidth >= 768;
+  const isDesktop = windowWidth >= 1200;
 
   const registrationSteps = [
-    { title: 'Ticket Selection', description: 'Choose your tickets' },
-    { title: 'Registration', description: 'Enter your details' },
-    { title: 'Payment', description: 'Complete purchase' },
+    { title: t('registration.steps.ticketSelection'), description: t('registration.steps.ticketSelectionDesc') },
+    { title: t('registration.steps.registration'), description: t('registration.steps.registrationDesc') },
+    { title: t('registration.steps.payment'), description: t('registration.steps.paymentDesc') },
   ];
 
   // Calculate base total from ticket selections
   const baseTotal = ticketSelections.reduce((total, selection) => {
     // TODO: Get actual ticket prices from ticket types
-    // For now, assume a default price structure
     return total + (selection.quantity * 50); // Placeholder price
   }, 0);
 
@@ -85,7 +70,6 @@ const RegistrationStepTwo: React.FC<RegistrationStepTwoProps> = ({
   }, [event.id]);
 
   useEffect(() => {
-    // Initialize field values from initial form data
     if (initialFormData.customFieldValues) {
       setFieldValues(initialFormData.customFieldValues);
     }
@@ -98,15 +82,13 @@ const RegistrationStepTwo: React.FC<RegistrationStepTwoProps> = ({
       const fields = await registrationService.getCustomFields(event.id);
       setCustomFields(fields);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load registration fields';
+      const errorMessage = error instanceof Error ? error.message : t('registration.errors.loadFieldsFailed');
       setLoadingError(errorMessage);
-      toast({
-        title: 'Loading Error',
-        description: errorMessage,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      Alert.alert(
+        t('common.error'),
+        errorMessage,
+        [{ text: t('common.confirm'), style: 'default' }]
+      );
     } finally {
       setIsLoadingFields(false);
     }
@@ -133,11 +115,11 @@ const RegistrationStepTwo: React.FC<RegistrationStepTwoProps> = ({
     if (field.required) {
       if (field.fieldType === 'checkbox') {
         if (!value) {
-          return `${field.label} is required`;
+          return t('registration.formValidation.fieldRequired', { field: field.label });
         }
       } else {
         if (!value || (typeof value === 'string' && !value.trim())) {
-          return `${field.label} is required`;
+          return t('registration.formValidation.fieldRequired', { field: field.label });
         }
       }
     }
@@ -148,7 +130,7 @@ const RegistrationStepTwo: React.FC<RegistrationStepTwoProps> = ({
       if (field.fieldType === 'email') {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(value)) {
-          return 'Please enter a valid email address';
+          return t('registration.formValidation.emailInvalid');
         }
       }
 
@@ -157,17 +139,17 @@ const RegistrationStepTwo: React.FC<RegistrationStepTwoProps> = ({
         const { minLength, maxLength, pattern } = field.validationRules;
 
         if (minLength && value.length < minLength) {
-          return `${field.label} must be at least ${minLength} characters`;
+          return t('registration.formValidation.minLength', { field: field.label, min: minLength });
         }
 
         if (maxLength && value.length > maxLength) {
-          return `${field.label} must not exceed ${maxLength} characters`;
+          return t('registration.formValidation.maxLength', { field: field.label, max: maxLength });
         }
 
         if (pattern) {
           const regex = new RegExp(pattern);
           if (!regex.test(value)) {
-            return `${field.label} format is invalid`;
+            return t('registration.formValidation.invalidFormat', { field: field.label });
           }
         }
       }
@@ -195,13 +177,11 @@ const RegistrationStepTwo: React.FC<RegistrationStepTwoProps> = ({
 
   const handleNext = async () => {
     if (!validateForm()) {
-      toast({
-        title: 'Form Validation Error',
-        description: 'Please fix the errors below and try again.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      Alert.alert(
+        t('registration.formValidation.errorTitle'),
+        t('registration.formValidation.errorDescription'),
+        [{ text: t('common.confirm'), style: 'default' }]
+      );
       return;
     }
 
@@ -211,21 +191,19 @@ const RegistrationStepTwo: React.FC<RegistrationStepTwoProps> = ({
       const formData: RegistrationFormData = {
         ticketSelections,
         customFieldValues: fieldValues,
-        discountCode: appliedDiscountCode,
+        discountCode: appliedDiscountCode || undefined,
         totalAmount: finalTotal,
         discountAmount: discountResult?.valid ? discountResult.discountAmount : 0,
       };
 
       onNext(formData);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to process registration';
-      toast({
-        title: 'Processing Error',
-        description: errorMessage,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      const errorMessage = error instanceof Error ? error.message : t('registration.errors.processingFailed');
+      Alert.alert(
+        t('common.error'),
+        errorMessage,
+        [{ text: t('common.confirm'), style: 'default' }]
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -236,231 +214,361 @@ const RegistrationStepTwo: React.FC<RegistrationStepTwoProps> = ({
     setAppliedDiscountCode(result.valid ? code || null : null);
   };
 
-  const formatPrice = (price: number): string => {
-    return new Intl.NumberFormat('en-US', {
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('zh-TW', {
       style: 'currency',
-      currency: 'USD',
-    }).format(price);
+      currency: 'TWD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
   };
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    contentContainer: {
+      padding: spacing.md,
+      paddingBottom: spacing.xl,
+      maxWidth: isDesktop ? 1200 : '100%',
+      alignSelf: 'center',
+      width: '100%',
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: spacing.xl * 4,
+    },
+    loadingText: {
+      ...typography.body,
+      color: colors.midGrey,
+      marginTop: spacing.md,
+    },
+    headerSection: {
+      marginBottom: spacing.lg,
+    },
+    pageTitle: {
+      ...typography.h1,
+      color: colors.primary,
+      marginBottom: spacing.sm,
+    },
+    pageDescription: {
+      ...typography.body,
+      color: colors.midGrey,
+    },
+    sectionCard: {
+      marginVertical: spacing.sm,
+    },
+    sectionTitle: {
+      ...typography.h2,
+      color: colors.primary,
+      marginBottom: spacing.md,
+    },
+    fieldGrid: {
+      flexDirection: isTablet ? 'row' : 'column',
+      flexWrap: 'wrap',
+      marginHorizontal: -spacing.sm,
+    },
+    fieldColumn: {
+      width: isTablet ? '50%' : '100%',
+      paddingHorizontal: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    errorCard: {
+      backgroundColor: colors.danger + '10',
+      borderColor: colors.danger,
+      borderWidth: 1,
+      marginVertical: spacing.sm,
+    },
+    errorText: {
+      ...typography.body,
+      color: colors.danger,
+    },
+    summaryRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.sm,
+    },
+    summaryLabel: {
+      ...typography.body,
+      color: colors.text,
+    },
+    summaryValue: {
+      ...typography.body,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    discountRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginVertical: spacing.sm,
+    },
+    discountLabel: {
+      ...typography.body,
+      color: colors.success,
+    },
+    discountValue: {
+      ...typography.body,
+      fontWeight: '600',
+      color: colors.success,
+    },
+    totalRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: spacing.sm,
+      paddingTop: spacing.sm,
+    },
+    totalLabel: {
+      ...typography.h2,
+      color: colors.primary,
+      fontWeight: 'bold',
+    },
+    totalValue: {
+      ...typography.h2,
+      color: colors.primary,
+      fontWeight: 'bold',
+    },
+    actionContainer: {
+      marginTop: spacing.lg,
+    },
+    actionButtons: {
+      flexDirection: isTablet ? 'row' : 'column',
+      justifyContent: 'space-between',
+      alignItems: isTablet ? 'center' : 'stretch',
+      gap: spacing.md,
+    },
+    backButton: {
+      flex: isTablet ? 0 : 1,
+      minWidth: isTablet ? 150 : '100%',
+    },
+    nextButton: {
+      flex: isTablet ? 0 : 1,
+      minWidth: isTablet ? 200 : '100%',
+    },
+    footerCard: {
+      backgroundColor: colors.lightGrey,
+      marginTop: spacing.lg,
+      padding: spacing.md,
+    },
+    footerText: {
+      ...typography.small,
+      color: colors.midGrey,
+      textAlign: 'center',
+    },
+    retryButton: {
+      marginTop: spacing.md,
+    },
+  });
 
   if (isLoadingFields) {
     return (
-      <Container maxW="4xl" py={8}>
-        <Center py={20}>
-          <VStack spacing={4}>
-            <Spinner size="xl" color={primaryColor} />
-            <Text color={neutralMedium}>Loading registration form...</Text>
-          </VStack>
-        </Center>
-      </Container>
+      <ScrollView style={styles.container}>
+        <View style={styles.contentContainer}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>{t('registration.loadingForm')}</Text>
+          </View>
+        </View>
+      </ScrollView>
     );
   }
 
   if (loadingError) {
     return (
-      <Container maxW="4xl" py={8}>
-        <VStack spacing={8} align="stretch">
-          <Box>
-            <StepIndicator
-              steps={registrationSteps}
-              currentStep={1}
-              size="md"
-            />
-          </Box>
+      <ScrollView style={styles.container}>
+        <View style={styles.contentContainer}>
+          <StepIndicator
+            steps={registrationSteps}
+            currentStep={1}
+          />
           
-          <Alert status="error" borderRadius="md">
-            <AlertIcon />
-            <VStack align="start" spacing={2}>
-              <AlertDescription fontWeight="semibold">
-                Failed to load registration form
-              </AlertDescription>
-              <AlertDescription fontSize="sm">
-                {loadingError}
-              </AlertDescription>
-              <Button size="sm" onClick={loadCustomFields} colorScheme="red" variant="outline">
-                Try Again
-              </Button>
-            </VStack>
-          </Alert>
+          <Card containerStyle={styles.errorCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Icon name="alert-circle" type="material-community" size={24} color={colors.danger} />
+              <View style={{ marginLeft: spacing.sm, flex: 1 }}>
+                <Text style={[styles.errorText, { fontWeight: '600', marginBottom: spacing.xs }]}>
+                  {t('registration.errors.loadFormFailed')}
+                </Text>
+                <Text style={[styles.errorText, { fontSize: 14 }]}>
+                  {loadingError}
+                </Text>
+                <Button
+                  title={t('common.tryAgain')}
+                  onPress={loadCustomFields}
+                  type="outline"
+                  buttonStyle={styles.retryButton}
+                  titleStyle={{ color: colors.danger }}
+                />
+              </View>
+            </View>
+          </Card>
 
-          <HStack justify="space-between">
-            <Button
-              leftIcon={<ArrowBackIcon />}
-              variant="outline"
-              onClick={onBack}
-              borderColor={borderColor}
-              color={neutralMedium}
-            >
-              Back to Tickets
-            </Button>
-          </HStack>
-        </VStack>
-      </Container>
+          <View style={styles.actionContainer}>
+            <View style={styles.actionButtons}>
+              <Button
+                title={t('registration.backToTickets')}
+                type="outline"
+                icon={
+                  <Icon
+                    name="arrow-left"
+                    type="material-community"
+                    size={20}
+                    color={colors.midGrey}
+                    style={{ marginRight: spacing.xs }}
+                  />
+                }
+                onPress={onBack}
+                buttonStyle={styles.backButton}
+                titleStyle={{ color: colors.midGrey }}
+              />
+            </View>
+          </View>
+        </View>
+      </ScrollView>
     );
   }
 
   return (
-    <Container maxW="4xl" py={8}>
-      <VStack spacing={8} align="stretch">
+    <ScrollView style={styles.container}>
+      <View style={styles.contentContainer}>
         {/* Step Indicator */}
-        <Box>
-          <StepIndicator
-            steps={registrationSteps}
-            currentStep={1}
-            size="md"
-          />
-        </Box>
+        <StepIndicator
+          steps={registrationSteps}
+          currentStep={1}
+        />
 
         {/* Page Header */}
-        <Box>
-          <Heading size="lg" color={primaryColor} mb={2}>
-            Registration Details
-          </Heading>
-          <Text color={neutralMedium}>
-            Please fill out the required information to complete your registration for {event.title}.
+        <View style={styles.headerSection}>
+          <Text style={styles.pageTitle}>{t('registration.registrationDetails')}</Text>
+          <Text style={styles.pageDescription}>
+            {t('registration.registrationDescription', { eventTitle: event.title })}
           </Text>
-        </Box>
+        </View>
 
         {/* Custom Fields Form */}
         {customFields.length > 0 && (
-          <Card>
-            <CardBody>
-              <VStack spacing={6} align="stretch">
-                <Heading size="md" color={primaryColor}>
-                  Required Information
-                </Heading>
-                
-                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-                  {customFields.map((field) => (
-                    <DynamicFieldRenderer
-                      key={field.id}
-                      field={field}
-                      value={fieldValues[field.id]}
-                      onChange={(value) => handleFieldChange(field.id, value)}
-                      error={fieldErrors[field.id]}
-                      isDisabled={isLoading || isSubmitting}
-                    />
-                  ))}
-                </SimpleGrid>
-              </VStack>
-            </CardBody>
+          <Card containerStyle={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>{t('registration.requiredInformation')}</Text>
+            
+            <View style={styles.fieldGrid}>
+              {customFields.map((field) => (
+                <View key={field.id} style={styles.fieldColumn}>
+                  <DynamicFieldRenderer
+                    field={field}
+                    value={fieldValues[field.id]}
+                    onChange={(value) => handleFieldChange(field.id, value)}
+                    error={fieldErrors[field.id]}
+                    isDisabled={isLoading || isSubmitting}
+                  />
+                </View>
+              ))}
+            </View>
           </Card>
         )}
 
         {/* Discount Code Section */}
-        <Card>
-          <CardBody>
-            <VStack spacing={4} align="stretch">
-              <Heading size="md" color={primaryColor}>
-                Discount Code
-              </Heading>
-              
-              <DiscountCodeInput
-                eventId={event.id}
-                totalAmount={baseTotal}
-                onDiscountApplied={handleDiscountApplied}
-                isDisabled={isLoading || isSubmitting}
-              />
-            </VStack>
-          </CardBody>
+        <Card containerStyle={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>{t('registration.discountCode')}</Text>
+          
+          <DiscountCodeInput
+            eventId={event.id}
+            totalAmount={baseTotal}
+            onDiscountApplied={handleDiscountApplied}
+            isDisabled={isLoading || isSubmitting}
+          />
         </Card>
 
         {/* Order Summary */}
-        <Card>
-          <CardBody>
-            <VStack spacing={4} align="stretch">
-              <Heading size="md" color={primaryColor}>
-                Order Summary
-              </Heading>
-              
-              <VStack spacing={3} align="stretch">
-                {ticketSelections.map((selection, index) => (
-                  <HStack key={index} justify="space-between">
-                    <Text>
-                      Ticket × {selection.quantity}
-                    </Text>
-                    <Text fontWeight="semibold">
-                      {formatPrice(selection.quantity * 50)} {/* Placeholder price */}
-                    </Text>
-                  </HStack>
-                ))}
-                
-                {discountResult?.valid && (
-                  <>
-                    <Divider />
-                    <HStack justify="space-between" color={errorColor}>
-                      <Text>Discount</Text>
-                      <Text fontWeight="semibold">
-                        -{formatPrice(discountResult.discountAmount)}
-                      </Text>
-                    </HStack>
-                  </>
-                )}
-                
-                <Divider />
-                <HStack justify="space-between" fontSize="lg" fontWeight="bold">
-                  <Text color={primaryColor}>Total</Text>
-                  <Text color={primaryColor}>
-                    {formatPrice(finalTotal)}
-                  </Text>
-                </HStack>
-              </VStack>
-            </VStack>
-          </CardBody>
+        <Card containerStyle={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>{t('registration.orderSummary')}</Text>
+          
+          {ticketSelections.map((selection, index) => (
+            <View key={index} style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>
+                {t('registration.ticketQuantity')} × {selection.quantity}
+              </Text>
+              <Text style={styles.summaryValue}>
+                {formatCurrency(selection.quantity * 50)}
+              </Text>
+            </View>
+          ))}
+          
+          {discountResult?.valid && (
+            <>
+              <Divider style={{ marginVertical: spacing.sm }} />
+              <View style={styles.discountRow}>
+                <Text style={styles.discountLabel}>{t('registration.discount')}</Text>
+                <Text style={styles.discountValue}>
+                  -{formatCurrency(discountResult.discountAmount)}
+                </Text>
+              </View>
+            </>
+          )}
+          
+          <Divider style={{ marginVertical: spacing.sm }} />
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>{t('registration.total')}</Text>
+            <Text style={styles.totalValue}>
+              {formatCurrency(finalTotal)}
+            </Text>
+          </View>
         </Card>
 
         {/* Action Buttons */}
-        <HStack justify="space-between" pt={4}>
-          <Button
-            leftIcon={<ArrowBackIcon />}
-            variant="outline"
-            onClick={onBack}
-            isDisabled={isLoading || isSubmitting}
-            borderColor={borderColor}
-            color={neutralMedium}
-            _hover={{
-              borderColor: primaryColor,
-              color: primaryColor,
-            }}
-          >
-            Back to Tickets
-          </Button>
+        <View style={styles.actionContainer}>
+          <View style={styles.actionButtons}>
+            <Button
+              title={t('registration.backToTickets')}
+              type="outline"
+              icon={
+                <Icon
+                  name="arrow-left"
+                  type="material-community"
+                  size={20}
+                  color={colors.midGrey}
+                  style={{ marginRight: spacing.xs }}
+                />
+              }
+              onPress={onBack}
+              disabled={isLoading || isSubmitting}
+              buttonStyle={styles.backButton}
+              titleStyle={{ color: colors.midGrey }}
+            />
 
-          <Button
-            rightIcon={<ArrowForwardIcon />}
-            colorScheme="blue"
-            onClick={handleNext}
-            isLoading={isSubmitting}
-            loadingText="Processing..."
-            isDisabled={isLoading}
-            size="lg"
-            backgroundColor={primaryColor}
-            _hover={{
-              backgroundColor: '#1D4ED8',
-            }}
-            _active={{
-              backgroundColor: '#1E40AF',
-            }}
-          >
-            Continue to Payment
-          </Button>
-        </HStack>
+            <Button
+              title={t('registration.continueToPayment')}
+              icon={
+                <Icon
+                  name="arrow-right"
+                  type="material-community"
+                  size={20}
+                  color={colors.white}
+                  style={{ marginLeft: spacing.xs }}
+                />
+              }
+              iconPosition="right"
+              onPress={handleNext}
+              loading={isSubmitting}
+              loadingProps={{ color: colors.white }}
+              disabled={isLoading}
+              buttonStyle={[styles.nextButton, { backgroundColor: colors.primary }]}
+            />
+          </View>
+        </View>
 
         {/* Footer Notice */}
-        <Box
-          p={4}
-          backgroundColor={neutralLight}
-          borderRadius="md"
-          borderWidth={1}
-          borderColor={borderColor}
-        >
-          <Text fontSize="sm" color={neutralMedium} textAlign="center">
-            Your information is secure and will only be used for event registration purposes.
-            No payment will be processed until the final step.
+        <Card containerStyle={styles.footerCard}>
+          <Text style={styles.footerText}>
+            {t('registration.securityNotice')}
           </Text>
-        </Box>
-      </VStack>
-    </Container>
+        </Card>
+      </View>
+    </ScrollView>
   );
 };
 

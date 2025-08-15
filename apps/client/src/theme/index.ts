@@ -1,245 +1,375 @@
-import { extendTheme } from '@chakra-ui/react';
+import { useTheme as useRNETheme } from '@rneui/themed';
 
-// UIUX Brand Colors as specified in docs/UIUX/branding-style-guide.md
+// Color palette based on UI/UX spec
 const colors = {
-  primary: {
-    50: '#EBF4FF',
-    100: '#C3DAFE',
-    200: '#A3BFFA',
-    300: '#7F9CF5',
-    400: '#667EEA',
-    500: '#2563EB', // Main primary color
-    600: '#1D4ED8',
-    700: '#1E40AF',
-    800: '#1E3A8A',
-    900: '#1E3A8A',
+  primary: '#007BFF',
+  white: '#FFFFFF',
+  lightGrey: '#F8F9FA',
+  midGrey: '#6C757D',
+  dark: '#212529',
+  success: '#28A745',
+  error: '#DC3545', // Use error consistently instead of danger
+  warning: '#FFC107',
+  // Additional semantic colors
+  background: '#FFFFFF',
+  surface: '#F8F9FA',
+  text: '#212529',
+  textSecondary: '#6C757D',
+  border: '#E9ECEF',
+  disabled: '#CED4DA',
+  // React Native Elements compatible colors
+  danger: '#DC3545', // Keep danger as alias for backward compatibility
+  grey0: '#F8F9FA',
+  grey1: '#F8F9FA', 
+  grey2: '#6C757D',
+  grey3: '#6C757D',
+  grey4: '#6C757D',
+  grey5: '#212529',
+  greyOutline: '#E9ECEF',
+};
+
+// Typography based on UI/UX spec
+const typography = {
+  h1: {
+    fontSize: 24,
+    fontWeight: 'bold' as const,
+    color: colors.dark,
   },
-  secondary: {
-    50: '#F8FAFC',
-    100: '#F1F5F9',
-    200: '#E2E8F0',
-    300: '#CBD5E1',
-    400: '#94A3B8',
-    500: '#475569', // Main secondary color
-    600: '#334155',
-    700: '#1E293B',
-    800: '#0F172A',
-    900: '#020617',
+  h2: {
+    fontSize: 20,
+    fontWeight: 'bold' as const,
+    color: colors.dark,
   },
-  accent: {
-    50: '#FFFBEB',
-    100: '#FEF3C7',
-    200: '#FDE68A',
-    300: '#FCD34D',
-    400: '#FBBF24',
-    500: '#F59E0B', // Main accent color
-    600: '#D97706',
-    700: '#B45309',
-    800: '#92400E',
-    900: '#78350F',
+  h3: {
+    fontSize: 18,
+    fontWeight: '600' as const,
+    color: colors.dark,
   },
-  success: {
-    50: '#ECFDF5',
-    100: '#D1FAE5',
-    200: '#A7F3D0',
-    300: '#6EE7B7',
-    400: '#34D399',
-    500: '#10B981', // Main success color
-    600: '#059669',
-    700: '#047857',
-    800: '#065F46',
-    900: '#064E3B',
+  h4: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: colors.dark,
   },
-  warning: {
-    50: '#FFFBEB',
-    100: '#FEF3C7',
-    200: '#FDE68A',
-    300: '#FCD34D',
-    400: '#FBBF24', // Main warning color
-    500: '#F59E0B',
-    600: '#D97706',
-    700: '#B45309',
-    800: '#92400E',
-    900: '#78350F',
+  body: {
+    fontSize: 16,
+    fontWeight: 'normal' as const,
+    color: colors.text,
   },
-  error: {
-    50: '#FEF2F2',
-    100: '#FEE2E2',
-    200: '#FECACA',
-    300: '#FCA5A5',
-    400: '#F87171',
-    500: '#EF4444', // Main error color
-    600: '#DC2626',
-    700: '#B91C1C',
-    800: '#991B1B',
-    900: '#7F1D1D',
+  small: {
+    fontSize: 14,
+    fontWeight: 'normal' as const,
+    color: colors.textSecondary,
   },
-  neutral: {
-    50: '#F8FAFC',
-    100: '#F1F5F9',
-    200: '#E2E8F0',
-    300: '#CBD5E1',
-    400: '#94A3B8',
-    500: '#64748B',
-    600: '#475569',
-    700: '#334155',
-    800: '#1E293B',
-    900: '#0F172A',
+  caption: {
+    fontSize: 12,
+    fontWeight: 'normal' as const,
+    color: colors.textSecondary,
   },
 };
 
-// Typography scale as specified in UIUX guidelines
-const fonts = {
-  heading: 'Inter, Noto Sans TC, -apple-system, BlinkMacSystemFont, sans-serif',
-  body: 'Inter, Noto Sans TC, -apple-system, BlinkMacSystemFont, sans-serif',
-  mono: 'Roboto Mono, Menlo, Monaco, Consolas, monospace',
+// Spacing based on 8pt grid system
+const spacing = {
+  xs: 4,  // 0.5x
+  sm: 8,  // 1x
+  md: 16, // 2x
+  lg: 24, // 3x
+  xl: 32, // 4x
+  xxl: 40, // 5x
+  xxxl: 48, // 6x
 };
 
-const fontSizes = {
-  xs: '12px',
-  sm: '14px', // Small text
-  md: '16px', // Body text
-  lg: '18px',
-  xl: '20px',
-  '2xl': '24px', // H3
-  '3xl': '30px', // H2
-  '4xl': '36px', // H1
+// Responsive breakpoints
+const breakpoints = {
+  sm: 0,     // Mobile
+  md: 768,   // Tablet
+  lg: 1200,  // Desktop
 };
 
-const fontWeights = {
-  normal: 400,
-  medium: 500,
-  semibold: 600,
-  bold: 700,
-};
-
-const lineHeights = {
-  normal: 1.5,
-  shorter: 1.3,
-  short: 1.2,
-};
-
-// 4px grid system spacing
-const space = {
-  px: '1px',
-  0.5: '2px',
-  1: '4px',
-  1.5: '6px',
-  2: '8px',
-  2.5: '10px',
-  3: '12px',
-  3.5: '14px',
-  4: '16px',
-  5: '20px',
-  6: '24px',
-  7: '28px',
-  8: '32px',
-  9: '36px',
-  10: '40px',
-  12: '48px',
-  14: '56px',
-  16: '64px',
-  20: '80px',
-  24: '96px',
-  28: '112px',
-  32: '128px',
-  36: '144px',
-  40: '160px',
-  44: '176px',
-  48: '192px',
-  52: '208px',
-  56: '224px',
-  60: '240px',
-  64: '256px',
-  72: '288px',
-  80: '320px',
-  96: '384px',
-};
-
-// Component overrides for better accessibility and brand consistency
-const components = {
-  Button: {
-    baseStyle: {
-      fontWeight: 'bold',
-      borderRadius: '8px',
-      _focus: {
-        boxShadow: '0 0 0 3px rgba(37, 99, 235, 0.1)',
+// Create the theme - using simple object structure
+export const theme = {
+  colors: {
+    primary: colors.primary,
+    secondary: colors.midGrey,
+    success: colors.success,
+    warning: colors.warning,
+    error: colors.error,
+    background: colors.background,
+    white: colors.white,
+    black: colors.dark,
+    grey: colors.midGrey, // Add grey alias
+    grey0: colors.lightGrey,
+    grey1: colors.lightGrey,
+    grey2: colors.midGrey,
+    grey3: colors.midGrey,
+    grey4: colors.midGrey,
+    grey5: colors.dark,
+    greyOutline: colors.border,
+    info: colors.primary, // Add info color
+    card: colors.surface, // Add card background
+    textPrimary: colors.text, // Add text primary
+    textSecondary: colors.textSecondary, // Add text secondary
+    searchBg: colors.lightGrey,
+    divider: colors.border,
+    border: colors.border, // Add border color
+    dark: colors.dark, // Add dark color
+    midGrey: colors.midGrey, // Add midGrey
+    danger: colors.danger, // Keep danger for backward compatibility
+    lightGrey: colors.lightGrey, // Add lightGrey
+    text: colors.text, // Add text color
+    surface: colors.surface, // Add surface color
+    disabled: colors.disabled, // Add disabled color
+  },
+  mode: 'light' as const,
+  components: {
+    // Component-specific theme overrides
+    Text: {
+      h1Style: typography.h1,
+      h2Style: typography.h2,
+      h3Style: {
+        fontSize: 18,
+        fontWeight: '600' as const,
+        color: colors.dark,
+      },
+      h4Style: {
+        fontSize: 16,
+        fontWeight: '600' as const,
+        color: colors.dark,
+      },
+      style: typography.body,
+    },
+    Button: {
+      buttonStyle: {
+        borderRadius: 8,
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.lg,
+      },
+      titleStyle: {
+        fontSize: 16,
+        fontWeight: '600' as const,
+      },
+      disabledStyle: {
+        backgroundColor: colors.disabled,
+      },
+      disabledTitleStyle: {
+        color: colors.midGrey,
       },
     },
-    sizes: {
-      lg: {
-        h: '48px',
-        minW: '48px',
-        fontSize: '18px',
-        px: '6',
+    Input: {
+      inputStyle: {
+        fontSize: 16,
+        color: colors.text,
+      },
+      containerStyle: {
+        paddingHorizontal: 0,
+      },
+      inputContainerStyle: {
+        borderBottomColor: colors.border,
+      },
+      placeholderTextColor: colors.midGrey,
+      errorStyle: {
+        color: colors.error,
+        fontSize: 12,
+        marginTop: spacing.xs,
       },
     },
-    variants: {
-      solid: {
-        _hover: {
-          _disabled: {
-            bg: 'neutral.300',
-          },
+    Card: {
+      containerStyle: {
+        borderRadius: 8,
+        backgroundColor: colors.white,
+        shadowColor: colors.dark,
+        shadowOffset: {
+          width: 0,
+          height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+        borderWidth: 1,
+        borderColor: colors.border,
+        padding: spacing.md,
+        marginVertical: spacing.sm,
+      },
+    },
+    ListItem: {
+      containerStyle: {
+        backgroundColor: colors.white,
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.md,
+      },
+    },
+    SearchBar: {
+      containerStyle: {
+        backgroundColor: colors.background,
+        borderTopWidth: 0,
+        borderBottomWidth: 0,
+        paddingHorizontal: 0,
+      },
+      inputContainerStyle: {
+        backgroundColor: colors.lightGrey,
+        borderRadius: 8,
+      },
+      inputStyle: {
+        fontSize: 16,
+        color: colors.text,
+      },
+      placeholderTextColor: colors.midGrey,
+    },
+    Badge: {
+      badgeStyle: {
+        borderRadius: 12,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.xs,
+      },
+      textStyle: {
+        fontSize: 12,
+        fontWeight: '600' as const,
+      },
+    },
+    Avatar: {
+      overlayContainerStyle: {
+        backgroundColor: colors.lightGrey,
+      },
+      titleStyle: {
+        color: colors.dark,
+      },
+    },
+    CheckBox: {
+      containerStyle: {
+        backgroundColor: 'transparent',
+        borderWidth: 0,
+        marginLeft: 0,
+        marginRight: 0,
+        paddingHorizontal: 0,
+      },
+      textStyle: {
+        fontSize: 16,
+        fontWeight: 'normal' as const,
+        color: colors.text,
+      },
+      checkedColor: colors.primary,
+    },
+    Divider: {
+      style: {
+        backgroundColor: colors.border,
+        height: 1,
+      },
+    },
+    Header: {
+      backgroundColor: colors.primary,
+      containerStyle: {
+        borderBottomWidth: 0,
+        paddingBottom: 0,
+        elevation: 4,
+        shadowColor: colors.dark,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      centerComponent: {
+        style: {
+          color: colors.white,
+          fontSize: 18,
+          fontWeight: '600' as const,
         },
       },
-    },
-  },
-  Input: {
-    baseStyle: {
-      field: {
-        borderRadius: '8px',
-        _focus: {
-          borderColor: 'primary.500',
-          boxShadow: '0 0 0 1px rgba(37, 99, 235, 0.1)',
-        },
-        _invalid: {
-          borderColor: 'error.500',
-          boxShadow: '0 0 0 1px rgba(239, 68, 68, 0.1)',
-        },
+      leftComponent: {
+        color: colors.white,
+      },
+      rightComponent: {
+        color: colors.white,
       },
     },
-    sizes: {
-      md: {
-        field: {
-          h: '48px',
-          px: '4',
-          py: '3',
-          fontSize: '16px',
-        },
+    Icon: {
+      color: colors.text,
+      size: 24,
+    },
+    Overlay: {
+      overlayStyle: {
+        backgroundColor: colors.white,
+        borderRadius: 8,
+        padding: spacing.lg,
+      },
+      backdropStyle: {
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
       },
     },
-  },
-  FormLabel: {
-    baseStyle: {
-      fontWeight: '600',
-      marginBottom: '2',
-      fontSize: '16px',
+    Skeleton: {
+      style: {
+        backgroundColor: colors.lightGrey,
+      },
+      skeletonStyle: {
+        backgroundColor: colors.border,
+      },
     },
-  },
-  FormErrorMessage: {
-    baseStyle: {
-      fontSize: '14px',
-      mt: '1',
+    SocialIcon: {
+      style: {
+        borderRadius: 24,
+      },
+    },
+    Switch: {
+      trackColor: {
+        true: colors.primary,
+        false: colors.border,
+      },
+      thumbColor: colors.white,
+    },
+    Tab: {
+      buttonStyle: {
+        paddingVertical: spacing.sm,
+      },
+      titleStyle: {
+        fontSize: 14,
+        fontWeight: '600' as const,
+      },
+    },
+    TabView: {
+      animationType: 'spring' as const,
+    },
+    Tooltip: {
+      backgroundColor: colors.dark,
+      overlayColor: 'rgba(0, 0, 0, 0.8)',
+      highlightColor: 'transparent',
     },
   },
 };
 
-const theme = extendTheme({
-  colors,
-  fonts,
-  fontSizes,
-  fontWeights,
-  lineHeights,
-  space,
-  components,
-  styles: {
-    global: {
-      body: {
-        bg: 'neutral.50',
-        color: 'neutral.900',
-      },
-    },
-  },
-});
+// Export custom theme properties for use in components
+export const customTheme = {
+  colors: theme.colors,
+  typography,
+  spacing,
+  breakpoints,
+};
 
-export default theme;
+// Custom typed theme hook
+export const useAppTheme = () => {
+  const { theme: rneTheme, updateTheme } = useRNETheme();
+  return {
+    theme: rneTheme,
+    updateTheme,
+    colors: theme.colors,
+    typography: customTheme.typography,
+    spacing: customTheme.spacing,
+    breakpoints: customTheme.breakpoints,
+  };
+};
+
+// Type definitions for TypeScript support
+export type AppTheme = typeof theme;
+export type AppColors = typeof colors;
+export type AppTypography = typeof typography;
+export type AppSpacing = typeof spacing;
+export type AppBreakpoints = typeof breakpoints;
+
+// Props interface for components that accept theme
+export interface ThemedProps {
+  theme?: Partial<AppTheme>;
+}
+
+// Helper type for component styles that use theme
+export type ThemedStyle<T = any> = (theme: {
+  colors: AppColors;
+  typography: AppTypography;
+  spacing: AppSpacing;
+  breakpoints: AppBreakpoints;
+}) => T;

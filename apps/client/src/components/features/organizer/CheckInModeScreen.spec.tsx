@@ -1,15 +1,14 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
-import { ChakraProvider } from '@chakra-ui/react';
+import { NavigationContainer } from '@react-navigation/native';
 import { CheckInModeScreen } from './CheckInModeScreen';
 import eventService from '../../../services/eventService';
 import { CheckInService } from '../../../services/checkinService';
 
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
-  useParams: () => ({ eventId: 'test-event-id' }),
-  useNavigate: () => jest.fn(),
+jest.mock('@react-navigation/native', () => ({
+  ...jest.requireActual('@react-navigation/native'),
+  useRoute: () => ({ params: { eventId: 'test-event-id' } }),
+  useNavigation: () => ({ navigate: jest.fn(), goBack: jest.fn() }),
 }));
 
 jest.mock('../../../services/eventService');
@@ -29,11 +28,9 @@ const mockEvent = {
 
 const renderComponent = () => {
   return render(
-    <BrowserRouter>
-      <ChakraProvider>
-        <CheckInModeScreen />
-      </ChakraProvider>
-    </BrowserRouter>
+    <NavigationContainer>
+      <CheckInModeScreen />
+    </NavigationContainer>
   );
 };
 

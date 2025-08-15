@@ -1,37 +1,16 @@
 import React from 'react';
-import {
-  Box,
-  VStack,
-  HStack,
-  Heading,
-  Text,
-  Card,
-  CardHeader,
-  CardBody,
-  SimpleGrid,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Progress,
-  useColorModeValue,
-  Flex,
-  Center,
-  Alert,
-  AlertIcon,
-} from '@chakra-ui/react';
+import { View, ScrollView, StyleSheet } from 'react-native';
+import { Card, Text, Divider, Icon } from '@rneui/themed';
+import { MaterialIcons } from '@expo/vector-icons';
 import { EventReport } from '@jctop-event/shared-types';
+import { useAppTheme } from '../../../theme';
 
 interface ReportVisualizationProps {
   report: EventReport;
 }
 
-export const ReportVisualization: React.FC<ReportVisualizationProps> = ({ report }) => {
-  const cardBgColor = useColorModeValue('white', 'neutral.800');
-  const borderColor = useColorModeValue('neutral.200', 'neutral.600');
-  const tableBgColor = useColorModeValue('neutral.50', 'neutral.700');
+const ReportVisualization: React.FC<ReportVisualizationProps> = ({ report }) => {
+  const { colors } = useAppTheme();
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -50,15 +29,15 @@ export const ReportVisualization: React.FC<ReportVisualizationProps> = ({ report
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'paid':
-        return 'success';
+        return colors.success;
       case 'checkedIn':
-        return 'primary';
+        return colors.primary;
       case 'pending':
-        return 'warning';
+        return colors.warning;
       case 'cancelled':
-        return 'error';
+        return colors.error;
       default:
-        return 'neutral';
+        return colors.grey2;
     }
   };
 
@@ -66,267 +45,537 @@ export const ReportVisualization: React.FC<ReportVisualizationProps> = ({ report
                                  report.registrationStats.byStatus.checkedIn;
 
   return (
-    <VStack spacing={6} align="stretch">
-      {/* Registration Status Breakdown */}
-      <Card bg={cardBgColor} borderColor={borderColor}>
-        <CardHeader>
-          <Heading size="md" color="primary.600">Registration Status Breakdown</Heading>
-        </CardHeader>
-        <CardBody>
-          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-            <VStack align="stretch" spacing={4}>
-              <Text fontWeight="semibold">Registration Distribution</Text>
+    <ScrollView showsVerticalScrollIndicator={false}>
+      <View style={styles.container}>
+        {/* Registration Status Breakdown */}
+        <Card containerStyle={[styles.card, { backgroundColor: colors.card }]}>
+          <Text h4 style={[styles.cardTitle, { color: colors.primary }]}>
+            Registration Status Breakdown
+          </Text>
+          
+          <View style={styles.statsGrid}>
+            {/* Registration Distribution */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Registration Distribution
+              </Text>
+              
               {Object.entries(report.registrationStats.byStatus).map(([status, count]) => {
                 const percentage = report.registrationStats.total > 0 
                   ? (count / report.registrationStats.total) * 100 
                   : 0;
                 
                 return (
-                  <Box key={status}>
-                    <HStack justify="space-between" mb={1}>
-                      <Text textTransform="capitalize" fontSize="sm">
-                        {status === 'checkedIn' ? 'Checked In' : status}
+                  <View key={status} style={styles.statItem}>
+                    <View style={styles.statHeader}>
+                      <Text style={[styles.statLabel, { color: colors.grey2 }]}>
+                        {status === 'checkedIn' ? 'Checked In' : status.charAt(0).toUpperCase() + status.slice(1)}
                       </Text>
-                      <Text fontSize="sm" fontWeight="medium">
+                      <Text style={[styles.statValue, { color: colors.text }]}>
                         {count} ({percentage.toFixed(1)}%)
                       </Text>
-                    </HStack>
-                    <Progress
-                      value={percentage}
-                      size="sm"
-                      colorScheme={getStatusColor(status)}
-                      bg="neutral.100"
-                    />
-                  </Box>
+                    </View>
+                    <View style={[styles.progressBar, { backgroundColor: colors.grey5 }]}>
+                      <View 
+                        style={[
+                          styles.progressFill,
+                          { 
+                            backgroundColor: getStatusColor(status),
+                            width: `${Math.min(percentage, 100)}%`
+                          }
+                        ]}
+                      />
+                    </View>
+                  </View>
                 );
               })}
-            </VStack>
+            </View>
 
-            <VStack align="start" spacing={3}>
-              <Text fontWeight="semibold">Quick Stats</Text>
-              <SimpleGrid columns={2} spacing={4} w="full">
-                <Box>
-                  <Text fontSize="2xl" fontWeight="bold" color="success.600">
+            {/* Quick Stats */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Quick Stats
+              </Text>
+              
+              <View style={styles.quickStatsGrid}>
+                <View style={styles.quickStatBox}>
+                  <Text style={[styles.bigNumber, { color: colors.success }]}>
                     {totalPaidRegistrations}
                   </Text>
-                  <Text fontSize="sm" color="neutral.600">Paid Registrations</Text>
-                </Box>
-                <Box>
-                  <Text fontSize="2xl" fontWeight="bold" color="primary.600">
+                  <Text style={[styles.quickStatLabel, { color: colors.grey2 }]}>
+                    Paid Registrations
+                  </Text>
+                </View>
+                
+                <View style={styles.quickStatBox}>
+                  <Text style={[styles.bigNumber, { color: colors.primary }]}>
                     {report.attendanceStats.rate}%
                   </Text>
-                  <Text fontSize="sm" color="neutral.600">Show-up Rate</Text>
-                </Box>
-                <Box>
-                  <Text fontSize="2xl" fontWeight="bold" color="warning.600">
+                  <Text style={[styles.quickStatLabel, { color: colors.grey2 }]}>
+                    Show-up Rate
+                  </Text>
+                </View>
+                
+                <View style={styles.quickStatBox}>
+                  <Text style={[styles.bigNumber, { color: colors.warning }]}>
                     {report.registrationStats.byStatus.pending}
                   </Text>
-                  <Text fontSize="sm" color="neutral.600">Pending</Text>
-                </Box>
-                <Box>
-                  <Text fontSize="2xl" fontWeight="bold" color="error.600">
+                  <Text style={[styles.quickStatLabel, { color: colors.grey2 }]}>
+                    Pending
+                  </Text>
+                </View>
+                
+                <View style={styles.quickStatBox}>
+                  <Text style={[styles.bigNumber, { color: colors.error }]}>
                     {report.registrationStats.byStatus.cancelled}
                   </Text>
-                  <Text fontSize="sm" color="neutral.600">Cancelled</Text>
-                </Box>
-              </SimpleGrid>
-            </VStack>
-          </SimpleGrid>
-        </CardBody>
-      </Card>
-
-      {/* Ticket Type Performance */}
-      {report.registrationStats.byTicketType.length > 0 && (
-        <Card bg={cardBgColor} borderColor={borderColor}>
-          <CardHeader>
-            <Heading size="md" color="primary.600">Ticket Type Performance</Heading>
-          </CardHeader>
-          <CardBody>
-            <Box overflowX="auto">
-              <Table variant="simple" bg={tableBgColor} borderRadius="md">
-                <Thead>
-                  <Tr>
-                    <Th>Ticket Type</Th>
-                    <Th isNumeric>Quantity Sold</Th>
-                    <Th isNumeric>Revenue</Th>
-                    <Th isNumeric>Avg. Price</Th>
-                    <Th>Performance</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {report.registrationStats.byTicketType.map((ticketType) => {
-                    const avgPrice = ticketType.quantitySold > 0 
-                      ? ticketType.revenue / ticketType.quantitySold 
-                      : 0;
-                    const revenuePercentage = report.revenue.gross > 0
-                      ? (ticketType.revenue / report.revenue.gross) * 100
-                      : 0;
-
-                    return (
-                      <Tr key={ticketType.ticketTypeId}>
-                        <Td fontWeight="medium">{ticketType.ticketTypeName}</Td>
-                        <Td isNumeric>{ticketType.quantitySold}</Td>
-                        <Td isNumeric fontWeight="semibold" color="success.600">
-                          {formatCurrency(ticketType.revenue)}
-                        </Td>
-                        <Td isNumeric>{formatCurrency(avgPrice)}</Td>
-                        <Td>
-                          <VStack align="start" spacing={1}>
-                            <Text fontSize="xs" color="neutral.600">
-                              {revenuePercentage.toFixed(1)}% of total
-                            </Text>
-                            <Progress
-                              value={revenuePercentage}
-                              size="sm"
-                              colorScheme="primary"
-                              w="100px"
-                            />
-                          </VStack>
-                        </Td>
-                      </Tr>
-                    );
-                  })}
-                </Tbody>
-              </Table>
-            </Box>
-          </CardBody>
+                  <Text style={[styles.quickStatLabel, { color: colors.grey2 }]}>
+                    Cancelled
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
         </Card>
-      )}
 
-      {/* Revenue Analysis */}
-      <Card bg={cardBgColor} borderColor={borderColor}>
-        <CardHeader>
-          <Heading size="md" color="primary.600">Revenue Analysis</Heading>
-        </CardHeader>
-        <CardBody>
-          <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6}>
-            <Box textAlign="center" p={4} bg={tableBgColor} borderRadius="md">
-              <Text fontSize="3xl" fontWeight="bold" color="success.600">
+        {/* Ticket Type Performance */}
+        {report.registrationStats.byTicketType.length > 0 && (
+          <Card containerStyle={[styles.card, { backgroundColor: colors.card }]}>
+            <Text h4 style={[styles.cardTitle, { color: colors.primary }]}>
+              Ticket Type Performance
+            </Text>
+            
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.table}>
+                {/* Table Header */}
+                <View style={[styles.tableRow, styles.tableHeader, { backgroundColor: colors.grey5 }]}>
+                  <Text style={[styles.tableCell, styles.tableCellHeader, { color: colors.text }]}>
+                    Ticket Type
+                  </Text>
+                  <Text style={[styles.tableCell, styles.tableCellHeader, styles.tableCellRight, { color: colors.text }]}>
+                    Sold
+                  </Text>
+                  <Text style={[styles.tableCell, styles.tableCellHeader, styles.tableCellRight, { color: colors.text }]}>
+                    Revenue
+                  </Text>
+                  <Text style={[styles.tableCell, styles.tableCellHeader, styles.tableCellRight, { color: colors.text }]}>
+                    Avg. Price
+                  </Text>
+                  <Text style={[styles.tableCell, styles.tableCellHeader, { color: colors.text, minWidth: 120 }]}>
+                    Performance
+                  </Text>
+                </View>
+                
+                {/* Table Body */}
+                {report.registrationStats.byTicketType.map((ticketType) => {
+                  const avgPrice = ticketType.quantitySold > 0 
+                    ? ticketType.revenue / ticketType.quantitySold 
+                    : 0;
+                  const revenuePercentage = report.revenue.gross > 0
+                    ? (ticketType.revenue / report.revenue.gross) * 100
+                    : 0;
+
+                  return (
+                    <View key={ticketType.ticketTypeId} style={styles.tableRow}>
+                      <Text style={[styles.tableCell, { color: colors.text }]}>
+                        {ticketType.ticketTypeName}
+                      </Text>
+                      <Text style={[styles.tableCell, styles.tableCellRight, { color: colors.text }]}>
+                        {ticketType.quantitySold}
+                      </Text>
+                      <Text style={[styles.tableCell, styles.tableCellRight, { color: colors.success, fontWeight: '600' }]}>
+                        {formatCurrency(ticketType.revenue)}
+                      </Text>
+                      <Text style={[styles.tableCell, styles.tableCellRight, { color: colors.text }]}>
+                        {formatCurrency(avgPrice)}
+                      </Text>
+                      <View style={[styles.tableCell, { minWidth: 120 }]}>
+                        <Text style={[styles.performanceText, { color: colors.grey2 }]}>
+                          {revenuePercentage.toFixed(1)}% of total
+                        </Text>
+                        <View style={[styles.progressBar, { backgroundColor: colors.grey5, marginTop: 4 }]}>
+                          <View 
+                            style={[
+                              styles.progressFill,
+                              { 
+                                backgroundColor: colors.primary,
+                                width: `${Math.min(revenuePercentage, 100)}%`
+                              }
+                            ]}
+                          />
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </Card>
+        )}
+
+        {/* Revenue Analysis */}
+        <Card containerStyle={[styles.card, { backgroundColor: colors.card }]}>
+          <Text h4 style={[styles.cardTitle, { color: colors.primary }]}>
+            Revenue Analysis
+          </Text>
+          
+          <View style={styles.revenueGrid}>
+            <View style={[styles.revenueBox, { backgroundColor: colors.grey5 }]}>
+              <Text style={[styles.revenueAmount, { color: colors.success }]}>
                 {formatCurrency(report.revenue.gross)}
               </Text>
-              <Text color="neutral.600">Gross Revenue</Text>
-            </Box>
+              <Text style={[styles.revenueLabel, { color: colors.grey2 }]}>
+                Gross Revenue
+              </Text>
+            </View>
             
-            <Box textAlign="center" p={4} bg={tableBgColor} borderRadius="md">
-              <Text fontSize="3xl" fontWeight="bold" color="warning.600">
+            <View style={[styles.revenueBox, { backgroundColor: colors.grey5 }]}>
+              <Text style={[styles.revenueAmount, { color: colors.warning }]}>
                 -{formatCurrency(report.revenue.discountAmount)}
               </Text>
-              <Text color="neutral.600">Total Discounts</Text>
-            </Box>
+              <Text style={[styles.revenueLabel, { color: colors.grey2 }]}>
+                Total Discounts
+              </Text>
+            </View>
             
-            <Box textAlign="center" p={4} bg={tableBgColor} borderRadius="md">
-              <Text fontSize="3xl" fontWeight="bold" color="primary.600">
+            <View style={[styles.revenueBox, { backgroundColor: colors.grey5 }]}>
+              <Text style={[styles.revenueAmount, { color: colors.primary }]}>
                 {formatCurrency(report.revenue.net)}
               </Text>
-              <Text color="neutral.600">Net Revenue</Text>
-            </Box>
-          </SimpleGrid>
+              <Text style={[styles.revenueLabel, { color: colors.grey2 }]}>
+                Net Revenue
+              </Text>
+            </View>
+          </View>
 
           {report.revenue.discountAmount > 0 && (
-            <Box mt={4} p={3} bg="warning.50" borderRadius="md" border="1px" borderColor="warning.200">
-              <Text fontSize="sm" color="warning.800">
-                <strong>Discount Impact:</strong> Discounts reduced revenue by{' '}
+            <View style={[styles.discountImpact, { backgroundColor: colors.warning + '10', borderColor: colors.warning }]}>
+              <Icon
+                name="info"
+                type="material"
+                color={colors.warning}
+                size={16}
+                containerStyle={styles.discountIcon}
+              />
+              <Text style={[styles.discountText, { color: colors.warning }]}>
+                <Text style={{ fontWeight: '600' }}>Discount Impact:</Text> Discounts reduced revenue by{' '}
                 {((report.revenue.discountAmount / report.revenue.gross) * 100).toFixed(1)}%
               </Text>
-            </Box>
+            </View>
           )}
-        </CardBody>
-      </Card>
+        </Card>
 
-      {/* Registration Timeline */}
-      {report.timeline.length > 0 ? (
-        <Card bg={cardBgColor} borderColor={borderColor}>
-          <CardHeader>
-            <Heading size="md" color="primary.600">Registration Timeline</Heading>
-          </CardHeader>
-          <CardBody>
-            <Box overflowX="auto">
-              <Table variant="simple" size="sm">
-                <Thead>
-                  <Tr>
-                    <Th>Date</Th>
-                    <Th isNumeric>Daily Registrations</Th>
-                    <Th isNumeric>Daily Revenue</Th>
-                    <Th isNumeric>Cumulative Registrations</Th>
-                    <Th isNumeric>Cumulative Revenue</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {report.timeline.slice(-10).map((point) => (
-                    <Tr key={point.date}>
-                      <Td>{formatDate(point.date)}</Td>
-                      <Td isNumeric>
-                        <Text color={point.registrations > 0 ? 'success.600' : 'neutral.500'}>
-                          {point.registrations}
-                        </Text>
-                      </Td>
-                      <Td isNumeric>
-                        <Text color={point.revenue > 0 ? 'success.600' : 'neutral.500'}>
-                          {formatCurrency(point.revenue)}
-                        </Text>
-                      </Td>
-                      <Td isNumeric fontWeight="medium">
-                        {point.cumulativeRegistrations}
-                      </Td>
-                      <Td isNumeric fontWeight="medium" color="primary.600">
-                        {formatCurrency(point.cumulativeRevenue)}
-                      </Td>
-                    </Tr>
-                  ))}
-                </Tbody>
-              </Table>
-            </Box>
+        {/* Registration Timeline */}
+        {report.timeline.length > 0 ? (
+          <Card containerStyle={[styles.card, { backgroundColor: colors.card }]}>
+            <Text h4 style={[styles.cardTitle, { color: colors.primary }]}>
+              Registration Timeline
+            </Text>
+            
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.table}>
+                {/* Table Header */}
+                <View style={[styles.tableRow, styles.tableHeader, { backgroundColor: colors.grey5 }]}>
+                  <Text style={[styles.tableCell, styles.tableCellHeader, { color: colors.text, minWidth: 80 }]}>
+                    Date
+                  </Text>
+                  <Text style={[styles.tableCell, styles.tableCellHeader, styles.tableCellRight, { color: colors.text }]}>
+                    Daily Reg.
+                  </Text>
+                  <Text style={[styles.tableCell, styles.tableCellHeader, styles.tableCellRight, { color: colors.text }]}>
+                    Daily Rev.
+                  </Text>
+                  <Text style={[styles.tableCell, styles.tableCellHeader, styles.tableCellRight, { color: colors.text }]}>
+                    Total Reg.
+                  </Text>
+                  <Text style={[styles.tableCell, styles.tableCellHeader, styles.tableCellRight, { color: colors.text }]}>
+                    Total Rev.
+                  </Text>
+                </View>
+                
+                {/* Table Body */}
+                {report.timeline.slice(-10).map((point) => (
+                  <View key={point.date} style={styles.tableRow}>
+                    <Text style={[styles.tableCell, { color: colors.text, minWidth: 80 }]}>
+                      {formatDate(point.date)}
+                    </Text>
+                    <Text style={[
+                      styles.tableCell, 
+                      styles.tableCellRight,
+                      { color: point.registrations > 0 ? colors.success : colors.grey3 }
+                    ]}>
+                      {point.registrations}
+                    </Text>
+                    <Text style={[
+                      styles.tableCell,
+                      styles.tableCellRight,
+                      { color: point.revenue > 0 ? colors.success : colors.grey3 }
+                    ]}>
+                      {formatCurrency(point.revenue)}
+                    </Text>
+                    <Text style={[styles.tableCell, styles.tableCellRight, { color: colors.text, fontWeight: '500' }]}>
+                      {point.cumulativeRegistrations}
+                    </Text>
+                    <Text style={[styles.tableCell, styles.tableCellRight, { color: colors.primary, fontWeight: '600' }]}>
+                      {formatCurrency(point.cumulativeRevenue)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+            
             {report.timeline.length > 10 && (
-              <Text fontSize="sm" color="neutral.600" mt={2} textAlign="center">
+              <Text style={[styles.timelineNote, { color: colors.grey2 }]}>
                 Showing last 10 days. Full timeline available in exported reports.
               </Text>
             )}
-          </CardBody>
-        </Card>
-      ) : (
-        <Alert status="info">
-          <AlertIcon />
-          No timeline data available - this typically means no registrations have been recorded yet.
-        </Alert>
-      )}
+          </Card>
+        ) : (
+          <View style={[styles.infoBox, { backgroundColor: colors.primary + '10', borderColor: colors.primary }]}>
+            <Icon
+              name="info"
+              type="material"
+              color={colors.primary}
+              size={20}
+              containerStyle={styles.infoIcon}
+            />
+            <Text style={[styles.infoText, { color: colors.primary }]}>
+              No timeline data available - this typically means no registrations have been recorded yet.
+            </Text>
+          </View>
+        )}
 
-      {/* Summary Insights */}
-      <Card bg={cardBgColor} borderColor={borderColor}>
-        <CardHeader>
-          <Heading size="md" color="primary.600">Event Insights</Heading>
-        </CardHeader>
-        <CardBody>
-          <VStack align="start" spacing={3}>
-            {report.attendanceStats.rate >= 80 && (
-              <Alert status="success" borderRadius="md">
-                <AlertIcon />
-                Excellent attendance rate! {report.attendanceStats.rate}% of registered attendees showed up.
-              </Alert>
+        {/* Summary Insights */}
+        <Card containerStyle={[styles.card, { backgroundColor: colors.card }]}>
+          <Text h4 style={[styles.cardTitle, { color: colors.primary }]}>
+            Event Insights
+          </Text>
+          
+          <View style={styles.insightsList}>
+            {report.attendanceStats.rate >= 70 && (
+              <View style={styles.insightItem}>
+                <Icon
+                  name="check-circle"
+                  type="material"
+                  color={colors.success}
+                  size={20}
+                  containerStyle={styles.insightIcon}
+                />
+                <Text style={[styles.insightText, { color: colors.text }]}>
+                  Great attendance rate! {report.attendanceStats.rate}% of paid registrants showed up.
+                </Text>
+              </View>
             )}
             
-            {report.attendanceStats.rate < 60 && report.attendanceStats.registered > 0 && (
-              <Alert status="warning" borderRadius="md">
-                <AlertIcon />
-                Consider improving check-in processes. Only {report.attendanceStats.rate}% of registered attendees checked in.
-              </Alert>
+            {report.revenue.discountAmount > report.revenue.gross * 0.2 && (
+              <View style={styles.insightItem}>
+                <Icon
+                  name="warning"
+                  type="material"
+                  color={colors.warning}
+                  size={20}
+                  containerStyle={styles.insightIcon}
+                />
+                <Text style={[styles.insightText, { color: colors.text }]}>
+                  Consider reviewing discount strategy - discounts account for more than 20% of gross revenue.
+                </Text>
+              </View>
             )}
-
-            {report.revenue.discountAmount > (report.revenue.gross * 0.2) && (
-              <Alert status="info" borderRadius="md">
-                <AlertIcon />
-                High discount usage: {((report.revenue.discountAmount / report.revenue.gross) * 100).toFixed(1)}% of gross revenue was discounted.
-              </Alert>
+            
+            {report.registrationStats.byStatus.pending > totalPaidRegistrations * 0.1 && (
+              <View style={styles.insightItem}>
+                <Icon
+                  name="info"
+                  type="material"
+                  color={colors.primary}
+                  size={20}
+                  containerStyle={styles.insightIcon}
+                />
+                <Text style={[styles.insightText, { color: colors.text }]}>
+                  {report.registrationStats.byStatus.pending} registrations are still pending payment.
+                </Text>
+              </View>
             )}
-
-            {report.registrationStats.byStatus.cancelled > (report.registrationStats.total * 0.1) && (
-              <Alert status="warning" borderRadius="md">
-                <AlertIcon />
-                High cancellation rate: {((report.registrationStats.byStatus.cancelled / report.registrationStats.total) * 100).toFixed(1)}% of registrations were cancelled.
-              </Alert>
-            )}
-          </VStack>
-        </CardBody>
-      </Card>
-    </VStack>
+          </View>
+        </Card>
+      </View>
+    </ScrollView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    paddingVertical: 16,
+  },
+  card: {
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardTitle: {
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  statsGrid: {
+    gap: 24,
+  },
+  section: {
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  statItem: {
+    marginBottom: 12,
+  },
+  statHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  statLabel: {
+    fontSize: 13,
+    textTransform: 'capitalize',
+  },
+  statValue: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  progressBar: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  quickStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  quickStatBox: {
+    width: '47%',
+  },
+  bigNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  quickStatLabel: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  table: {
+    minWidth: '100%',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e5',
+  },
+  tableHeader: {
+    paddingVertical: 12,
+  },
+  tableCell: {
+    flex: 1,
+    paddingHorizontal: 8,
+    fontSize: 13,
+    minWidth: 100,
+  },
+  tableCellHeader: {
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  tableCellRight: {
+    textAlign: 'right',
+  },
+  performanceText: {
+    fontSize: 11,
+  },
+  revenueGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  revenueBox: {
+    flex: 1,
+    minWidth: '30%',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  revenueAmount: {
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  revenueLabel: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  discountImpact: {
+    flexDirection: 'row',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  discountIcon: {
+    marginRight: 8,
+  },
+  discountText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  timelineNote: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  infoIcon: {
+    marginRight: 12,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 14,
+  },
+  insightsList: {
+    gap: 12,
+  },
+  insightItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  insightIcon: {
+    marginRight: 12,
+    marginTop: 2,
+  },
+  insightText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+});
+
+export { ReportVisualization };
+export default ReportVisualization;

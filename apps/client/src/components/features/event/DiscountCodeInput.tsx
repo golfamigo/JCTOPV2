@@ -1,21 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Input,
-  Button,
-  HStack,
-  VStack,
-  Text,
-  Alert,
-  AlertIcon,
-  AlertDescription,
-  FormControl,
-  FormLabel,
-  FormErrorMessage,
-  useColorModeValue,
-  Spinner,
-  Box,
-} from '@chakra-ui/react';
-import { CheckIcon, CloseIcon } from '@chakra-ui/icons';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { Input, Button, Text, Icon, Card } from '@rneui/themed';
+import { useTranslation } from 'react-i18next';
+import { useAppTheme } from '@/theme';
 import registrationService from '../../../services/registrationService';
 import { DiscountValidationResponse } from '@jctop-event/shared-types';
 
@@ -32,19 +19,13 @@ const DiscountCodeInput: React.FC<DiscountCodeInputProps> = ({
   onDiscountApplied,
   isDisabled = false,
 }) => {
+  const { t } = useTranslation();
+  const { colors, spacing, typography } = useAppTheme();
   const [code, setCode] = useState('');
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<DiscountValidationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hasAppliedDiscount, setHasAppliedDiscount] = useState(false);
-
-  // Design system colors following branding guide
-  const borderColor = useColorModeValue('#E2E8F0', '#475569');
-  const primaryColor = '#2563EB';
-  const successColor = '#10B981';
-  const errorColor = '#EF4444';
-  const neutralMedium = '#64748B';
-  const neutralLight = '#F8FAFC';
 
   useEffect(() => {
     // Reset validation when total amount changes
@@ -55,7 +36,7 @@ const DiscountCodeInput: React.FC<DiscountCodeInputProps> = ({
 
   const handleValidateCode = async () => {
     if (!code.trim()) {
-      setError('Please enter a discount code');
+      setError(t('registration.discountCodePlaceholder'));
       return;
     }
 
@@ -71,10 +52,10 @@ const DiscountCodeInput: React.FC<DiscountCodeInputProps> = ({
         onDiscountApplied(result, code.trim());
       } else {
         setHasAppliedDiscount(false);
-        setError(result.errorMessage || 'Invalid discount code');
+        setError(result.errorMessage || t('registration.invalidDiscountCode'));
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to validate discount code';
+      const errorMessage = err instanceof Error ? err.message : t('registration.errors.discountValidationFailed');
       setError(errorMessage);
       setValidationResult(null);
       setHasAppliedDiscount(false);
@@ -95,128 +76,214 @@ const DiscountCodeInput: React.FC<DiscountCodeInputProps> = ({
     });
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !isValidating && code.trim()) {
+  const handleSubmitEditing = () => {
+    if (!isValidating && code.trim()) {
       handleValidateCode();
     }
   };
 
-  const formatPrice = (price: number): string => {
-    return new Intl.NumberFormat('en-US', {
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('zh-TW', {
       style: 'currency',
-      currency: 'USD',
-    }).format(price);
+      currency: 'TWD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      marginVertical: spacing.sm,
+    },
+    label: {
+      ...typography.body,
+      fontWeight: '600',
+      color: colors.midGrey,
+      marginBottom: spacing.xs,
+    },
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.sm,
+    },
+    inputContainer: {
+      flex: 1,
+    },
+    input: {
+      ...typography.body,
+      textTransform: 'uppercase',
+    },
+    applyButton: {
+      minWidth: 100,
+      backgroundColor: colors.primary,
+    },
+    removeButton: {
+      minWidth: 100,
+      borderColor: colors.danger,
+    },
+    errorText: {
+      ...typography.small,
+      color: colors.danger,
+      marginTop: spacing.xs,
+    },
+    successCard: {
+      backgroundColor: colors.success + '10',
+      borderColor: colors.success,
+      borderWidth: 1,
+      marginTop: spacing.sm,
+    },
+    successContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    successText: {
+      flex: 1,
+    },
+    successTitle: {
+      ...typography.body,
+      fontWeight: '600',
+      color: colors.success,
+      marginBottom: spacing.xs,
+    },
+    successDetails: {
+      flexDirection: 'row',
+      gap: spacing.md,
+    },
+    successDetailText: {
+      ...typography.small,
+      color: colors.midGrey,
+    },
+    successAmount: {
+      fontWeight: '600',
+      color: colors.success,
+    },
+    totalAmount: {
+      fontWeight: 'bold',
+      color: colors.primary,
+    },
+    validatingCard: {
+      backgroundColor: colors.lightGrey,
+      marginTop: spacing.sm,
+      padding: spacing.md,
+    },
+    validatingContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    validatingText: {
+      ...typography.small,
+      color: colors.midGrey,
+    },
+  });
+
   return (
-    <VStack spacing={4} align="stretch">
-      <FormControl isInvalid={!!error}>
-        <FormLabel 
-          color={neutralMedium}
-          fontWeight="semibold"
-          fontSize="sm"
-        >
-          Discount Code (Optional)
-        </FormLabel>
+    <View style={styles.container}>
+      <Text style={styles.label}>
+        {t('registration.discountCode')} ({t('common.optional')})
+      </Text>
+      
+      <View style={styles.inputRow}>
+        <Input
+          placeholder={t('registration.discountCodePlaceholder')}
+          value={code}
+          onChangeText={(text) => setCode(text.toUpperCase())}
+          onSubmitEditing={handleSubmitEditing}
+          disabled={isDisabled || isValidating}
+          autoCapitalize="characters"
+          containerStyle={styles.inputContainer}
+          inputStyle={styles.input}
+          errorMessage={error || undefined}
+          errorStyle={styles.errorText}
+          rightIcon={
+            hasAppliedDiscount ? (
+              <Icon
+                name="check-circle"
+                type="material-community"
+                size={20}
+                color={colors.success}
+              />
+            ) : undefined
+          }
+        />
         
-        <HStack spacing={3}>
-          <Input
-            placeholder="Enter discount code"
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            onKeyPress={handleKeyPress}
-            isDisabled={isDisabled || isValidating}
-            borderColor={borderColor}
-            focusBorderColor={primaryColor}
-            _placeholder={{ color: neutralMedium }}
-            textTransform="uppercase"
-            flex={1}
+        {!hasAppliedDiscount ? (
+          <Button
+            title={t('registration.applyDiscount')}
+            onPress={handleValidateCode}
+            loading={isValidating}
+            loadingProps={{ color: colors.white }}
+            disabled={isDisabled || !code.trim() || isValidating}
+            buttonStyle={styles.applyButton}
+            titleStyle={{ color: colors.white }}
           />
-          
-          {!hasAppliedDiscount ? (
-            <Button
-              onClick={handleValidateCode}
-              isLoading={isValidating}
-              loadingText="Checking..."
-              isDisabled={isDisabled || !code.trim() || isValidating}
-              colorScheme="blue"
-              backgroundColor={primaryColor}
-              _hover={{ backgroundColor: '#1D4ED8' }}
-              size="md"
-              minW="100px"
-            >
-              {isValidating ? <Spinner size="sm" /> : 'Apply'}
-            </Button>
-          ) : (
-            <Button
-              onClick={handleRemoveDiscount}
-              isDisabled={isDisabled}
-              variant="outline"
-              borderColor={errorColor}
-              color={errorColor}
-              _hover={{
-                backgroundColor: errorColor,
-                color: 'white',
-              }}
-              size="md"
-              minW="100px"
-              leftIcon={<CloseIcon boxSize={3} />}
-            >
-              Remove
-            </Button>
-          )}
-        </HStack>
-        
-        {error && (
-          <FormErrorMessage color={errorColor} fontSize="sm">
-            {error}
-          </FormErrorMessage>
+        ) : (
+          <Button
+            title={t('common.remove')}
+            onPress={handleRemoveDiscount}
+            disabled={isDisabled}
+            type="outline"
+            buttonStyle={styles.removeButton}
+            titleStyle={{ color: colors.danger }}
+            icon={
+              <Icon
+                name="close"
+                type="material-community"
+                size={16}
+                color={colors.danger}
+                style={{ marginRight: spacing.xs }}
+              />
+            }
+          />
         )}
-      </FormControl>
+      </View>
 
       {/* Success Message */}
       {validationResult?.valid && (
-        <Alert status="success" borderRadius="md" backgroundColor={neutralLight}>
-          <AlertIcon color={successColor} />
-          <VStack align="start" spacing={1} flex={1}>
-            <AlertDescription fontWeight="semibold" color={successColor}>
-              Discount Applied Successfully!
-            </AlertDescription>
-            <HStack spacing={4} fontSize="sm" color={neutralMedium}>
-              <Text>
-                Discount: <Text as="span" fontWeight="semibold" color={successColor}>
-                  -{formatPrice(validationResult.discountAmount)}
-                </Text>
+        <Card containerStyle={styles.successCard}>
+          <View style={styles.successContent}>
+            <View style={styles.successText}>
+              <Text style={styles.successTitle}>
+                {t('registration.discountApplied')}
               </Text>
-              <Text>
-                New Total: <Text as="span" fontWeight="bold" color={primaryColor}>
-                  {formatPrice(validationResult.finalAmount)}
+              <View style={styles.successDetails}>
+                <Text style={styles.successDetailText}>
+                  {t('registration.discount')}: 
+                  <Text style={styles.successAmount}>
+                    -{formatCurrency(validationResult.discountAmount)}
+                  </Text>
                 </Text>
-              </Text>
-            </HStack>
-          </VStack>
-          <CheckIcon color={successColor} boxSize={4} />
-        </Alert>
+                <Text style={styles.successDetailText}>
+                  {t('registration.total')}: 
+                  <Text style={styles.totalAmount}>
+                    {formatCurrency(validationResult.finalAmount)}
+                  </Text>
+                </Text>
+              </View>
+            </View>
+            <Icon
+              name="check-circle"
+              type="material-community"
+              size={24}
+              color={colors.success}
+            />
+          </View>
+        </Card>
       )}
 
       {/* Validation Feedback */}
       {isValidating && (
-        <Box 
-          p={3} 
-          borderRadius="md" 
-          backgroundColor={neutralLight}
-          borderWidth={1}
-          borderColor={borderColor}
-        >
-          <HStack spacing={3}>
-            <Spinner size="sm" color={primaryColor} />
-            <Text fontSize="sm" color={neutralMedium}>
-              Validating discount code...
+        <Card containerStyle={styles.validatingCard}>
+          <View style={styles.validatingContent}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={styles.validatingText}>
+              {t('registration.validatingDiscountCode')}
             </Text>
-          </HStack>
-        </Box>
+          </View>
+        </Card>
       )}
-    </VStack>
+    </View>
   );
 };
 

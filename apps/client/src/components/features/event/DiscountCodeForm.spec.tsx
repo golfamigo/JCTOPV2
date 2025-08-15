@@ -1,15 +1,11 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ChakraProvider } from '@chakra-ui/react';
 import DiscountCodeForm from './DiscountCodeForm';
 import { DiscountCodeResponse } from '@jctop-event/shared-types';
 
 // Mock toast hook
 const mockToast = jest.fn();
-jest.mock('@chakra-ui/react', () => ({
-  ...jest.requireActual('@chakra-ui/react'),
-  useToast: () => mockToast,
-}));
+// Removed ChakraUI mock
 
 const renderComponent = (props: any = {}) => {
   const defaultProps = {

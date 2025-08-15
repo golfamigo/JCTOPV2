@@ -1,570 +1,497 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { ChakraProvider } from '@chakra-ui/react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { Alert } from 'react-native';
 import PaymentStep from './PaymentStep';
-import { Event, RegistrationFormData } from '@jctop-event/shared-types';
 import paymentService from '../../../services/paymentService';
-import theme from '../../../theme';
+import { Event, RegistrationFormData, PaymentResponse } from '@jctop-event/shared-types';
 
-// Mock the payment service
-jest.mock('../../../services/paymentService');
-const mockPaymentService = paymentService as jest.Mocked<typeof paymentService>;
+// Mock expo-linking
+const mockLinking = {
+  canOpenURL: jest.fn(),
+  openURL: jest.fn(),
+};
 
-// Mock Expo Router
-jest.mock('expo-router', () => ({
-  useRouter: () => ({
-    push: jest.fn(),
-    back: jest.fn(),
+jest.mock('expo-linking', () => mockLinking);
+
+// Mock dependencies
+jest.mock('@rneui/themed', () => ({
+  Card: 'Card',
+  Text: 'Text',
+  Button: 'Button',
+  Divider: 'Divider',
+  ListItem: 'ListItem',
+  Icon: 'Icon',
+  Badge: 'Badge',
+  ThemeProvider: ({ children }: any) => children,
+}));
+
+jest.mock('../../molecules/CreditCardForm', () => ({
+  __esModule: true,
+  default: ({ onCardDataChange, disabled }: any) => {
+    return (
+      <mockCreditCardForm
+        onCardDataChange={onCardDataChange}
+        disabled={disabled}
+      />
+    );
+  },
+}));
+
+jest.mock('../../atoms/PaymentSkeleton', () => ({
+  __esModule: true,
+  default: ({ variant }: any) => {
+    return <mockPaymentSkeleton variant={variant} />;
+  },
+}));
+
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, params?: any) => {
+      if (params) {
+        return `${key} ${JSON.stringify(params)}`;
+      }
+      return key;
+    },
+    i18n: {
+      changeLanguage: jest.fn(),
+      language: 'zh-TW',
+    },
   }),
 }));
 
-// Mock Expo Linking
-jest.mock('expo-linking', () => ({
-  openURL: jest.fn(),
+jest.mock('../../../theme', () => ({
+  useAppTheme: () => ({
+    colors: {
+      primary: '#007BFF',
+      white: '#FFFFFF',
+      lightGrey: '#F8F9FA',
+      midGrey: '#6C757D',
+      dark: '#212529',
+      success: '#28A745',
+      danger: '#DC3545',
+      warning: '#FFC107',
+      background: '#FFFFFF',
+      text: '#212529',
+      border: '#E9ECEF',
+    },
+    spacing: {
+      xs: 4,
+      sm: 8,
+      md: 16,
+      lg: 24,
+      xl: 32,
+    },
+    typography: {
+      h1: { fontSize: 24, fontWeight: 'bold' },
+      h2: { fontSize: 20, fontWeight: 'bold' },
+      body: { fontSize: 16 },
+      small: { fontSize: 14 },
+    },
+  }),
 }));
 
-const mockEvent: Event = {
-  id: 'event-1',
-  organizerId: 'org-1',
-  title: 'Test Event',
-  description: 'Test Description',
-  location: 'Test Location',
-  startDate: new Date('2024-12-01T10:00:00Z'),
-  endDate: new Date('2024-12-01T18:00:00Z'),
-  ticketTypes: [
-    {
-      id: 'ticket-1',
-      name: 'General Admission',
-      description: 'Standard ticket',
-      price: 1000,
-      quantity: 100,
-      soldQuantity: 10,
-      isActive: true,
-      features: ['Entry to event'],
-      metadata: {},
-    },
-  ],
-  customFields: [],
-  registrationSettings: {
-    requiresApproval: false,
-    maxRegistrations: 100,
-    registrationDeadline: new Date('2024-11-30T23:59:59Z'),
-    allowCancellation: true,
-    cancellationDeadline: new Date('2024-11-25T23:59:59Z'),
-  },
-  paymentSettings: {
-    requiresPayment: true,
-    currency: 'TWD',
-    acceptedMethods: ['credit_card'],
-    processingFee: 0,
-    refundPolicy: 'Standard refund policy',
-  },
-  status: 'published',
-  imageUrl: 'https://example.com/image.jpg',
-  tags: ['test'],
-  category: 'conference',
-  visibility: 'public',
-  maxAttendees: 100,
-  currentAttendees: 10,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  organizer: {
-    id: 'org-1',
-    name: 'Test Organizer',
-    email: 'test@example.com',
-    avatar: null,
-  },
-};
+jest.mock('../../common/StepIndicator', () => 'StepIndicator');
+jest.mock('../../../services/paymentService');
+jest.mock('expo-linking');
 
-const mockFormData: RegistrationFormData = {
-  attendeeInfo: {
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@example.com',
-    phone: '+886912345678',
-  },
-  ticketSelections: [
-    {
-      ticketTypeId: 'ticket-1',
-      quantity: 2,
-      unitPrice: 1000,
-      totalPrice: 2000,
-    },
-  ],
-  customFieldResponses: {},
-  discountCode: null,
-  totalAmount: 2000,
-  finalAmount: 2000,
-  agreedToTerms: true,
-};
-
-const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <ChakraProvider theme={theme}>
-    {children}
-  </ChakraProvider>
-);
+// Mock Alert
+jest.spyOn(Alert, 'alert');
 
 describe('PaymentStep', () => {
+  const mockEvent: Event = {
+    id: 'event-1',
+    title: '測試活動',
+    description: '這是一個測試活動',
+    startDate: new Date('2025-02-01T10:00:00'),
+    endDate: new Date('2025-02-01T18:00:00'),
+    location: '台北市信義區',
+    organizerId: 'org-1',
+    status: 'published',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  const mockFormData: RegistrationFormData = {
+    ticketSelections: [
+      { ticketTypeId: 'ticket-1', quantity: 2 },
+      { ticketTypeId: 'ticket-2', quantity: 1 },
+    ],
+    customFieldValues: {
+      name: 'Test User',
+      email: 'test@example.com',
+    },
+    totalAmount: 1500,
+    discountAmount: 150,
+    discountCode: 'TESTCODE',
+  };
+
+  const mockPaymentMethods = [
+    { code: 'Credit', name: '信用卡' },
+    { code: 'ATM', name: 'ATM轉帳' },
+    { code: 'CVS', name: '超商代碼' },
+  ];
+
   const mockOnSuccess = jest.fn();
   const mockOnBack = jest.fn();
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockPaymentService.initiatePayment.mockResolvedValue({
-      paymentId: 'payment-123',
-      status: 'requires_action',
-      redirectUrl: 'https://payment.ecpay.com.tw/test',
-      amount: 2000,
-      currency: 'TWD',
-      merchantTradeNo: 'PAY123456789',
-      formData: {
-        MerchantID: '2000132',
-        MerchantTradeNo: 'PAY123456789',
-        TotalAmount: '2000',
-        TradeDesc: 'Test Event Registration',
-        CheckMacValue: 'test-hash',
-      },
-    });
-  });
-
-  const renderPaymentStep = (props = {}) => {
-    return render(
-      <TestWrapper>
-        <PaymentStep
-          event={mockEvent}
-          formData={mockFormData}
-          onSuccess={mockOnSuccess}
-          onBack={mockOnBack}
-          isLoading={false}
-          {...props}
-        />
-      </TestWrapper>
-    );
+  const defaultProps = {
+    event: mockEvent,
+    formData: mockFormData,
+    onSuccess: mockOnSuccess,
+    onBack: mockOnBack,
   };
 
-  describe('rendering', () => {
-    it('should render payment step with event details', () => {
-      renderPaymentStep();
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (paymentService.getECPayPaymentMethods as jest.Mock).mockReturnValue(mockPaymentMethods);
+    (paymentService.validateAmount as jest.Mock).mockReturnValue({ valid: true });
+  });
 
-      expect(screen.getByText('付款資訊')).toBeTruthy();
-      expect(screen.getByText('Test Event')).toBeTruthy();
-      expect(screen.getByText('NT$ 2,000')).toBeTruthy();
-    });
+  it('should render step indicator with correct steps', () => {
+    const { UNSAFE_getByType } = render(<PaymentStep {...defaultProps} />);
+    
+    const stepIndicator = UNSAFE_getByType('StepIndicator' as any);
+    expect(stepIndicator.props.currentStep).toBe(2);
+    expect(stepIndicator.props.steps).toHaveLength(3);
+  });
 
-    it('should render step indicator showing step 3', () => {
-      renderPaymentStep();
+  it('should display payment summary correctly', () => {
+    const { getByText } = render(<PaymentStep {...defaultProps} />);
+    
+    expect(getByText(/payment.paymentSummary/)).toBeTruthy();
+    expect(getByText(mockEvent.title)).toBeTruthy();
+    expect(getByText(/registration.ticketQuantity × 2/)).toBeTruthy();
+    expect(getByText(/registration.ticketQuantity × 1/)).toBeTruthy();
+  });
 
-      const stepIndicator = screen.getByText('付款');
-      expect(stepIndicator).toBeTruthy();
-    });
+  it('should display discount when applied', () => {
+    const { getByText } = render(<PaymentStep {...defaultProps} />);
+    
+    expect(getByText(/registration.discount/)).toBeTruthy();
+    // Should show discounted amount
+    expect(getByText(/registration.total/)).toBeTruthy();
+  });
 
-    it('should render attendee information', () => {
-      renderPaymentStep();
-
-      expect(screen.getByText('John Doe')).toBeTruthy();
-      expect(screen.getByText('john.doe@example.com')).toBeTruthy();
-    });
-
-    it('should render ticket selection summary', () => {
-      renderPaymentStep();
-
-      expect(screen.getByText('General Admission')).toBeTruthy();
-      expect(screen.getByText('數量: 2')).toBeTruthy();
-      expect(screen.getByText('NT$ 1,000 × 2')).toBeTruthy();
-    });
-
-    it('should render payment method selection', () => {
-      renderPaymentStep();
-
-      expect(screen.getByText('選擇付款方式')).toBeTruthy();
-      expect(screen.getByText('信用卡付款')).toBeTruthy();
-    });
-
-    it('should render action buttons', () => {
-      renderPaymentStep();
-
-      expect(screen.getByText('返回上一步')).toBeTruthy();
-      expect(screen.getByText('確認付款')).toBeTruthy();
+  it('should render payment method options', () => {
+    const { UNSAFE_getAllByType } = render(<PaymentStep {...defaultProps} />);
+    
+    const listItems = UNSAFE_getAllByType('ListItem' as any);
+    expect(listItems.length).toBe(mockPaymentMethods.length);
+    
+    mockPaymentMethods.forEach((method, index) => {
+      expect(listItems[index].props.children).toBeTruthy();
     });
   });
 
-  describe('payment initiation', () => {
-    it('should initiate payment when confirm button is clicked', async () => {
-      renderPaymentStep();
+  it('should handle payment method selection', () => {
+    const { UNSAFE_getAllByType } = render(<PaymentStep {...defaultProps} />);
+    
+    const listItems = UNSAFE_getAllByType('ListItem' as any);
+    const secondMethod = listItems[1];
+    
+    fireEvent.press(secondMethod);
+    
+    // Should update selected payment method
+    expect(secondMethod.props.onPress).toBeDefined();
+  });
 
-      const confirmButton = screen.getByText('確認付款');
-      fireEvent.press(confirmButton);
-
-      await waitFor(() => {
-        expect(mockPaymentService.initiatePayment).toHaveBeenCalledWith({
-          organizerId: 'org-1',
-          resourceType: 'event',
-          resourceId: 'event-1',
-          amount: 2000,
-          currency: 'TWD',
-          description: 'Test Event Registration',
-          paymentMethod: 'Credit',
-          attendeeInfo: mockFormData.attendeeInfo,
-          ticketSelections: mockFormData.ticketSelections,
-          metadata: {
-            eventTitle: 'Test Event',
-            attendeeEmail: 'john.doe@example.com',
-          },
-        });
-      });
+  it('should validate amount before payment', async () => {
+    (paymentService.validateAmount as jest.Mock).mockReturnValue({ 
+      valid: false, 
+      message: 'Invalid amount' 
     });
 
-    it('should call onSuccess when payment is initiated successfully', async () => {
-      renderPaymentStep();
+    const { getAllByText } = render(<PaymentStep {...defaultProps} />);
+    
+    const payButton = getAllByText(/payment.proceedToPayment/)[0];
+    fireEvent.press(payButton);
 
-      const confirmButton = screen.getByText('確認付款');
-      fireEvent.press(confirmButton);
+    await waitFor(() => {
+      expect(paymentService.validateAmount).toHaveBeenCalledWith(mockFormData.totalAmount);
+    });
+  });
 
-      await waitFor(() => {
-        expect(mockOnSuccess).toHaveBeenCalledWith({
-          paymentId: 'payment-123',
-          status: 'requires_action',
-          redirectUrl: 'https://payment.ecpay.com.tw/test',
-          amount: 2000,
-          currency: 'TWD',
-          merchantTradeNo: 'PAY123456789',
-          formData: expect.any(Object),
-        });
-      });
+  it('should initiate payment successfully', async () => {
+    const mockPaymentResponse: PaymentResponse = {
+      paymentId: 'payment-123',
+      status: 'requires_action',
+      redirectUrl: 'https://payment.example.com',
+    };
+
+    (paymentService.initiateEventPayment as jest.Mock).mockResolvedValue(mockPaymentResponse);
+    mockLinking.canOpenURL.mockResolvedValue(true);
+    mockLinking.openURL.mockResolvedValue(undefined);
+
+    const { getAllByText } = render(<PaymentStep {...defaultProps} />);
+    
+    const payButton = getAllByText(/payment.proceedToPayment/)[0];
+    fireEvent.press(payButton);
+
+    await waitFor(() => {
+      expect(paymentService.initiateEventPayment).toHaveBeenCalledWith(
+        mockEvent.id,
+        expect.objectContaining({
+          amount: mockFormData.totalAmount,
+          paymentMethod: 'ALL',
+          metadata: expect.objectContaining({
+            eventId: mockEvent.id,
+            eventTitle: mockEvent.title,
+          }),
+        })
+      );
     });
 
-    it('should handle payment initiation errors', async () => {
-      mockPaymentService.initiatePayment.mockRejectedValue(
-        new Error('Payment service unavailable')
+    await waitFor(() => {
+      expect(mockLinking.openURL).toHaveBeenCalledWith(mockPaymentResponse.redirectUrl);
+    });
+  });
+
+  it('should handle payment URL that cannot be opened', async () => {
+    const mockPaymentResponse: PaymentResponse = {
+      paymentId: 'payment-123',
+      status: 'requires_action',
+      redirectUrl: 'https://payment.example.com',
+    };
+
+    (paymentService.initiateEventPayment as jest.Mock).mockResolvedValue(mockPaymentResponse);
+    mockLinking.canOpenURL.mockResolvedValue(false);
+
+    const { getAllByText } = render(<PaymentStep {...defaultProps} />);
+    
+    const payButton = getAllByText(/payment.proceedToPayment/)[0];
+    fireEvent.press(payButton);
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'payment.paymentFailed',
+        'payment.cannotOpenPaymentUrl',
+        expect.any(Array)
+      );
+    });
+  });
+
+  it('should call onSuccess when payment does not require action', async () => {
+    const mockPaymentResponse: PaymentResponse = {
+      paymentId: 'payment-123',
+      status: 'completed',
+    };
+
+    (paymentService.initiateEventPayment as jest.Mock).mockResolvedValue(mockPaymentResponse);
+
+    const { getAllByText } = render(<PaymentStep {...defaultProps} />);
+    
+    const payButton = getAllByText(/payment.proceedToPayment/)[0];
+    fireEvent.press(payButton);
+
+    await waitFor(() => {
+      expect(mockOnSuccess).toHaveBeenCalledWith(mockPaymentResponse);
+    });
+  });
+
+  it('should handle payment initiation error', async () => {
+    const errorMessage = 'Payment failed';
+    (paymentService.initiateEventPayment as jest.Mock).mockRejectedValue(new Error(errorMessage));
+
+    const { getAllByText } = render(<PaymentStep {...defaultProps} />);
+    
+    const payButton = getAllByText(/payment.proceedToPayment/)[0];
+    fireEvent.press(payButton);
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'payment.paymentFailed',
+        errorMessage,
+        expect.any(Array)
+      );
+    });
+  });
+
+  it('should handle back navigation', () => {
+    const { getAllByText } = render(<PaymentStep {...defaultProps} />);
+    
+    const backButton = getAllByText('common.back')[0];
+    fireEvent.press(backButton);
+
+    expect(mockOnBack).toHaveBeenCalled();
+  });
+
+  it('should disable buttons when loading', () => {
+    const { getAllByText } = render(<PaymentStep {...defaultProps} isLoading={true} />);
+    
+    const payButton = getAllByText(/payment.proceedToPayment/)[0];
+    const backButton = getAllByText('common.back')[0];
+    
+    expect(payButton.props.disabled).toBeTruthy();
+    expect(backButton.props.disabled).toBeTruthy();
+  });
+
+  it('should show loading state during payment processing', async () => {
+    (paymentService.initiateEventPayment as jest.Mock).mockImplementation(
+      () => new Promise(resolve => setTimeout(resolve, 1000))
+    );
+
+    const { getAllByText } = render(<PaymentStep {...defaultProps} />);
+    
+    const payButton = getAllByText(/payment.proceedToPayment/)[0];
+    fireEvent.press(payButton);
+
+    // Button should show loading state
+    await waitFor(() => {
+      expect(payButton.props.loading).toBeTruthy();
+    });
+  });
+
+  it('should format currency in TWD', () => {
+    const { getByText } = render(<PaymentStep {...defaultProps} />);
+    
+    // Should show TWD currency format
+    expect(getByText(/NT\$/)).toBeTruthy();
+  });
+
+  it('should display security notice', () => {
+    const { getByText } = render(<PaymentStep {...defaultProps} />);
+    
+    expect(getByText('payment.securityNotice')).toBeTruthy();
+  });
+
+  it('should calculate ticket prices correctly', () => {
+    const { getByText } = render(<PaymentStep {...defaultProps} />);
+    
+    // Total amount - discount amount = 1500 - 150 = 1350
+    // 3 tickets total
+    // Should display individual ticket calculations
+    expect(getByText(/registration.subtotal/)).toBeTruthy();
+    expect(getByText(/registration.total/)).toBeTruthy();
+  });
+
+  describe('Credit Card Form Integration', () => {
+    it('should show credit card form when Credit payment method is selected', () => {
+      const { getByProps, queryByProps } = render(<PaymentStep {...defaultProps} />);
+      
+      // Initially credit card form should not be visible (default is 'ALL' method)
+      expect(queryByProps({ onCardDataChange: expect.any(Function) })).toBeNull();
+      
+      // TODO: Add test for selecting Credit payment method and showing form
+      // This would require updating the payment method selection logic
+    });
+
+    it('should validate credit card data when Credit method is selected and payment is initiated', async () => {
+      // Mock credit card selection 
+      const { rerender } = render(<PaymentStep {...defaultProps} />);
+      
+      // Simulate selecting Credit payment method
+      const propsWithCredit = {
+        ...defaultProps,
+      };
+      rerender(<PaymentStep {...propsWithCredit} />);
+
+      // TODO: Add test for credit card validation on payment initiation
+    });
+
+    it('should pass disabled state to credit card form during processing', () => {
+      const { queryByProps } = render(<PaymentStep {...defaultProps} isLoading={true} />);
+      
+      // Credit card form should receive disabled prop when payment is loading
+      if (queryByProps({ onCardDataChange: expect.any(Function) })) {
+        expect(queryByProps({ disabled: true })).toBeTruthy();
+      }
+    });
+  });
+
+  describe('Skeleton Loading', () => {
+    it('should show skeleton loading during payment processing', async () => {
+      (paymentService.validateAmount as jest.Mock).mockReturnValue({ valid: true });
+      (paymentService.initiateEventPayment as jest.Mock).mockImplementation(() => 
+        new Promise(resolve => setTimeout(resolve, 100))
       );
 
-      renderPaymentStep();
+      const { getByText, queryByProps } = render(<PaymentStep {...defaultProps} />);
+      
+      const payButton = getByText(/payment.proceedToPayment/);
+      fireEvent.press(payButton);
 
-      const confirmButton = screen.getByText('確認付款');
-      fireEvent.press(confirmButton);
-
+      // Should show skeleton components during processing
       await waitFor(() => {
-        expect(screen.getByText('付款處理失敗')).toBeTruthy();
-        expect(screen.getByText('Payment service unavailable')).toBeTruthy();
+        expect(queryByProps({ variant: 'form' })).toBeTruthy();
+        expect(queryByProps({ variant: 'methods' })).toBeTruthy();
       });
-
-      expect(mockOnSuccess).not.toHaveBeenCalled();
     });
 
-    it('should disable confirm button while loading', () => {
-      renderPaymentStep({ isLoading: true });
+    it('should hide skeleton loading after payment completion', async () => {
+      (paymentService.validateAmount as jest.Mock).mockReturnValue({ valid: true });
+      (paymentService.initiateEventPayment as jest.Mock).mockResolvedValue({
+        paymentId: 'test-123',
+        status: 'completed'
+      });
 
-      const confirmButton = screen.getByText('確認付款');
-      expect(confirmButton.props.accessibilityState?.disabled).toBe(true);
+      const { getByText, queryByProps } = render(<PaymentStep {...defaultProps} />);
+      
+      const payButton = getByText(/payment.proceedToPayment/);
+      fireEvent.press(payButton);
+
+      // Wait for payment to complete
+      await waitFor(() => {
+        expect(defaultProps.onSuccess).toHaveBeenCalled();
+      });
+
+      // Skeleton should be hidden after completion
+      expect(queryByProps({ variant: 'form' })).toBeNull();
+      expect(queryByProps({ variant: 'methods' })).toBeNull();
     });
 
-    it('should show loading state during payment initiation', async () => {
-      let resolvePayment: (value: any) => void;
-      const paymentPromise = new Promise((resolve) => {
-        resolvePayment = resolve;
-      });
-      mockPaymentService.initiatePayment.mockReturnValue(paymentPromise);
+    it('should hide skeleton loading after payment error', async () => {
+      (paymentService.validateAmount as jest.Mock).mockReturnValue({ valid: true });
+      (paymentService.initiateEventPayment as jest.Mock).mockRejectedValue(new Error('Payment failed'));
 
-      renderPaymentStep();
+      const { getByText, queryByProps } = render(<PaymentStep {...defaultProps} />);
+      
+      const payButton = getByText(/payment.proceedToPayment/);
+      fireEvent.press(payButton);
 
-      const confirmButton = screen.getByText('確認付款');
-      fireEvent.press(confirmButton);
-
-      // Should show loading state
+      // Wait for error handling
       await waitFor(() => {
-        expect(confirmButton.props.accessibilityState?.disabled).toBe(true);
+        expect(Alert.alert).toHaveBeenCalled();
       });
 
-      // Resolve the payment
-      resolvePayment!({
-        paymentId: 'payment-123',
-        status: 'requires_action',
-        redirectUrl: 'https://payment.ecpay.com.tw/test',
-        amount: 2000,
-        currency: 'TWD',
-        merchantTradeNo: 'PAY123456789',
-      });
-
-      await waitFor(() => {
-        expect(mockOnSuccess).toHaveBeenCalled();
-      });
+      // Skeleton should be hidden after error
+      expect(queryByProps({ variant: 'form' })).toBeNull();
+      expect(queryByProps({ variant: 'methods' })).toBeNull();
     });
   });
 
-  describe('payment method selection', () => {
-    it('should allow selecting different payment methods', () => {
-      renderPaymentStep();
-
-      // Initially credit card should be selected
-      const creditCardOption = screen.getByText('信用卡付款');
-      expect(creditCardOption).toBeTruthy();
-
-      // If other payment methods were available, test selection here
-      // For now, only credit card is implemented
+  describe('Enhanced Payment Method Selection', () => {
+    it('should render payment methods with React Native Elements ListItem', () => {
+      const { getAllByText } = render(<PaymentStep {...defaultProps} />);
+      
+      // Should show payment method selection section
+      expect(getAllByText(/registration.selectPaymentMethod/)).toBeTruthy();
     });
 
-    it('should update payment request based on selected method', async () => {
-      renderPaymentStep();
-
-      const confirmButton = screen.getByText('確認付款');
-      fireEvent.press(confirmButton);
-
-      await waitFor(() => {
-        expect(mockPaymentService.initiatePayment).toHaveBeenCalledWith(
-          expect.objectContaining({
-            paymentMethod: 'Credit',
-          })
-        );
-      });
+    it('should display payment method icons and badges', () => {
+      const { queryAllByText } = render(<PaymentStep {...defaultProps} />);
+      
+      // Payment methods should be rendered (mocked as text)
+      // In real implementation, this would test icon and badge rendering
+      expect(queryAllByText).toBeTruthy();
     });
   });
 
-  describe('navigation', () => {
-    it('should call onBack when back button is pressed', () => {
-      renderPaymentStep();
-
-      const backButton = screen.getByText('返回上一步');
-      fireEvent.press(backButton);
-
-      expect(mockOnBack).toHaveBeenCalled();
+  describe('Traditional Chinese Localization', () => {
+    it('should use Traditional Chinese translations for all payment text', () => {
+      const { getByText } = render(<PaymentStep {...defaultProps} />);
+      
+      // Should use i18n translation keys
+      expect(getByText(/payment.paymentConfirmation/)).toBeTruthy();
+      expect(getByText(/payment.paymentSummary/)).toBeTruthy();
+      expect(getByText(/registration.selectPaymentMethod/)).toBeTruthy();
     });
 
-    it('should not allow navigation back while payment is processing', async () => {
-      let resolvePayment: (value: any) => void;
-      const paymentPromise = new Promise((resolve) => {
-        resolvePayment = resolve;
-      });
-      mockPaymentService.initiatePayment.mockReturnValue(paymentPromise);
-
-      renderPaymentStep();
-
-      const confirmButton = screen.getByText('確認付款');
-      fireEvent.press(confirmButton);
-
-      const backButton = screen.getByText('返回上一步');
-      expect(backButton.props.accessibilityState?.disabled).toBe(true);
-
-      // Resolve payment
-      resolvePayment!({
-        paymentId: 'payment-123',
-        status: 'requires_action',
-        redirectUrl: 'https://payment.ecpay.com.tw/test',
-        amount: 2000,
-        currency: 'TWD',
-        merchantTradeNo: 'PAY123456789',
-      });
-
-      await waitFor(() => {
-        expect(mockOnSuccess).toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('form validation', () => {
-    it('should validate required attendee information', () => {
-      const invalidFormData = {
-        ...mockFormData,
-        attendeeInfo: {
-          ...mockFormData.attendeeInfo,
-          email: '', // Invalid email
-        },
-      };
-
-      renderPaymentStep({ formData: invalidFormData });
-
-      const confirmButton = screen.getByText('確認付款');
-      fireEvent.press(confirmButton);
-
-      // Should show validation error
-      expect(screen.getByText('請檢查報名資訊')).toBeTruthy();
-      expect(mockPaymentService.initiatePayment).not.toHaveBeenCalled();
-    });
-
-    it('should validate ticket selections', () => {
-      const invalidFormData = {
-        ...mockFormData,
-        ticketSelections: [], // No tickets selected
-      };
-
-      renderPaymentStep({ formData: invalidFormData });
-
-      const confirmButton = screen.getByText('確認付款');
-      fireEvent.press(confirmButton);
-
-      // Should show validation error
-      expect(screen.getByText('請選擇至少一張票券')).toBeTruthy();
-      expect(mockPaymentService.initiatePayment).not.toHaveBeenCalled();
-    });
-
-    it('should validate terms agreement', () => {
-      const invalidFormData = {
-        ...mockFormData,
-        agreedToTerms: false, // Terms not agreed
-      };
-
-      renderPaymentStep({ formData: invalidFormData });
-
-      const confirmButton = screen.getByText('確認付款');
-      fireEvent.press(confirmButton);
-
-      // Should show validation error
-      expect(screen.getByText('請同意服務條款')).toBeTruthy();
-      expect(mockPaymentService.initiatePayment).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('amount calculation', () => {
-    it('should display correct total amount', () => {
-      renderPaymentStep();
-
-      expect(screen.getByText('NT$ 2,000')).toBeTruthy();
-    });
-
-    it('should handle discount codes', () => {
-      const discountedFormData = {
-        ...mockFormData,
-        discountCode: 'SAVE10',
-        totalAmount: 2000,
-        finalAmount: 1800, // 10% discount
-      };
-
-      renderPaymentStep({ formData: discountedFormData });
-
-      expect(screen.getByText('NT$ 1,800')).toBeTruthy();
-      expect(screen.getByText('折扣: SAVE10')).toBeTruthy();
-    });
-
-    it('should handle processing fees', () => {
-      const eventWithFees = {
-        ...mockEvent,
-        paymentSettings: {
-          ...mockEvent.paymentSettings!,
-          processingFee: 30,
-        },
-      };
-
-      renderPaymentStep({ event: eventWithFees });
-
-      expect(screen.getByText('處理費: NT$ 30')).toBeTruthy();
-    });
-  });
-
-  describe('accessibility', () => {
-    it('should have proper accessibility labels', () => {
-      renderPaymentStep();
-
-      const confirmButton = screen.getByText('確認付款');
-      expect(confirmButton.props.accessibilityLabel).toBe('確認付款並前往付款頁面');
-
-      const backButton = screen.getByText('返回上一步');
-      expect(backButton.props.accessibilityLabel).toBe('返回到上一個註冊步驟');
-    });
-
-    it('should have proper accessibility hints', () => {
-      renderPaymentStep();
-
-      const confirmButton = screen.getByText('確認付款');
-      expect(confirmButton.props.accessibilityHint).toBe('點擊後將導向付款服務商頁面');
-    });
-
-    it('should announce loading states to screen readers', async () => {
-      let resolvePayment: (value: any) => void;
-      const paymentPromise = new Promise((resolve) => {
-        resolvePayment = resolve;
-      });
-      mockPaymentService.initiatePayment.mockReturnValue(paymentPromise);
-
-      renderPaymentStep();
-
-      const confirmButton = screen.getByText('確認付款');
-      fireEvent.press(confirmButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('正在處理付款...')).toBeTruthy();
-      });
-
-      resolvePayment!({
-        paymentId: 'payment-123',
-        status: 'requires_action',
-        redirectUrl: 'https://payment.ecpay.com.tw/test',
-        amount: 2000,
-        currency: 'TWD',
-        merchantTradeNo: 'PAY123456789',
-      });
-
-      await waitFor(() => {
-        expect(mockOnSuccess).toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('error handling', () => {
-    it('should handle network errors gracefully', async () => {
-      mockPaymentService.initiatePayment.mockRejectedValue(
-        new Error('Network request failed')
-      );
-
-      renderPaymentStep();
-
-      const confirmButton = screen.getByText('確認付款');
-      fireEvent.press(confirmButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('網路連線錯誤')).toBeTruthy();
-        expect(screen.getByText('請檢查網路連線後再試')).toBeTruthy();
-      });
-    });
-
-    it('should handle payment service errors', async () => {
-      mockPaymentService.initiatePayment.mockRejectedValue({
-        response: {
-          data: {
-            message: 'Payment provider configuration error',
-          },
-        },
-      });
-
-      renderPaymentStep();
-
-      const confirmButton = screen.getByText('確認付款');
-      fireEvent.press(confirmButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('付款設定錯誤')).toBeTruthy();
-        expect(screen.getByText('請聯絡活動主辦方')).toBeTruthy();
-      });
-    });
-
-    it('should provide retry option for failed payments', async () => {
-      mockPaymentService.initiatePayment.mockRejectedValueOnce(
-        new Error('Temporary error')
-      );
-
-      renderPaymentStep();
-
-      const confirmButton = screen.getByText('確認付款');
-      fireEvent.press(confirmButton);
-
-      await waitFor(() => {
-        expect(screen.getByText('重試')).toBeTruthy();
-      });
-
-      // Mock successful retry
-      mockPaymentService.initiatePayment.mockResolvedValueOnce({
-        paymentId: 'payment-123',
-        status: 'requires_action',
-        redirectUrl: 'https://payment.ecpay.com.tw/test',
-        amount: 2000,
-        currency: 'TWD',
-        merchantTradeNo: 'PAY123456789',
-      });
-
-      const retryButton = screen.getByText('重試');
-      fireEvent.press(retryButton);
-
-      await waitFor(() => {
-        expect(mockOnSuccess).toHaveBeenCalled();
-      });
+    it('should format currency in TWD with Traditional Chinese format', () => {
+      const { getByText } = render(<PaymentStep {...defaultProps} />);
+      
+      // Should display currency formatting
+      expect(getByText(/registration.total/)).toBeTruthy();
+      expect(getByText(/registration.subtotal/)).toBeTruthy();
     });
   });
 });

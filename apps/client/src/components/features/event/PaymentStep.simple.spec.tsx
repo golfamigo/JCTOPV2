@@ -1,7 +1,6 @@
 // Simple PaymentStep component tests
 import React from 'react';
 import { render } from '@testing-library/react-native';
-import { ChakraProvider } from '@chakra-ui/react';
 import PaymentStep from './PaymentStep';
 
 // Mock services

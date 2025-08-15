@@ -1,366 +1,579 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import {
-  Box,
-  VStack,
-  HStack,
+  View,
+  ScrollView,
+  StyleSheet,
+  RefreshControl,
+  Alert,
+  ActivityIndicator,
+  TouchableOpacity,
+  Platform,
+} from 'react-native';
+import {
   Button,
   Text,
-  Heading,
-  Alert,
-  AlertIcon,
-  AlertDescription,
-  useColorModeValue,
-  Container,
   Card,
-  CardBody,
   Image,
   Divider,
-  Spinner,
-  Center,
   Icon,
   Badge,
-  useToast,
-  SimpleGrid,
-  EmptyState,
-  Flex,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
-  IconButton,
-} from '@chakra-ui/react';
-import { 
-  CalendarIcon, 
-  DownloadIcon, 
-  ViewIcon, 
-  ChevronDownIcon,
-  MoreHorizontalIcon,
-  ExternalLinkIcon 
-} from '@chakra-ui/icons';
+  SearchBar,
+  ButtonGroup,
+  Overlay,
+} from '@rneui/themed';
 import { Registration } from '@jctop-event/shared-types';
 import registrationService from '../../../services/registrationService';
+import { QRCodeModal } from './QRCodeModal';
+import { useAppTheme } from '../../../theme';
 
-const MyTicketsPage: React.FC = () => {
-  const [registrations, setRegistrations] = useState<Registration[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface MyTicketsPageProps {}
+
+const MyTicketsPage: React.FC<MyTicketsPageProps> = () => {
   const router = useRouter();
-  const toast = useToast();
+  const { colors, spacing } = useAppTheme();
+  
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [filteredRegistrations, setFilteredRegistrations] = useState<Registration[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedRegistration, setSelectedRegistration] = useState<Registration | null>(null);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [sortBy, setSortBy] = useState<'date' | 'event'>('date');
+  const [filterMenuVisible, setFilterMenuVisible] = useState(false);
 
-  const bgColor = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.600');
-  const cardBgColor = useColorModeValue('gray.50', 'gray.700');
+  const statusOptions = ['all', 'paid', 'pending', 'cancelled'];
+  const statusLabels = ['全部', '已付款', '待付款', '已取消'];
 
   useEffect(() => {
-    loadUserRegistrations();
+    loadRegistrations();
   }, []);
 
-  const loadUserRegistrations = async () => {
+  useEffect(() => {
+    filterRegistrations();
+  }, [searchQuery, selectedStatus, sortBy, registrations]);
+
+  const loadRegistrations = async () => {
     try {
-      setIsLoading(true);
-      const userRegistrations = await registrationService.getUserRegistrations();
-      setRegistrations(userRegistrations);
+      setError(null);
+      const data = await registrationService.getUserRegistrations();
+      setRegistrations(data);
+      setFilteredRegistrations(data);
     } catch (err: any) {
-      console.error('Error loading registrations:', err);
-      setError(err.message || '無法載入票券資訊');
+      setError(err.message || 'Failed to load tickets');
+      Alert.alert('錯誤', '無法載入票券資訊');
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
-  const handleDownloadQR = (registration: Registration) => {
-    if (!registration.qrCode) {
-      toast({
-        title: '無法下載',
-        description: 'QR Code 尚未生成',
-        status: 'warning',
-        duration: 3000,
-      });
-      return;
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    loadRegistrations();
+  };
+
+  const filterRegistrations = () => {
+    let filtered = [...registrations];
+
+    // Filter by status
+    if (selectedStatus !== 'all') {
+      filtered = filtered.filter(r => r.status === selectedStatus);
     }
 
-    const link = document.createElement('a');
-    link.href = registration.qrCode;
-    link.download = `ticket-${registration.id}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Filter by search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(r => 
+        (r as any).eventTitle?.toLowerCase().includes(query) ||
+        r.id.toLowerCase().includes(query)
+      );
+    }
 
-    toast({
-      title: 'QR Code 已下載',
-      description: '您的電子票券已下載完成',
-      status: 'success',
-      duration: 3000,
-    });
+    // Sort
+    if (sortBy === 'date') {
+      filtered.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    } else {
+      filtered.sort((a, b) => 
+        ((a as any).eventTitle || '').localeCompare((b as any).eventTitle || '')
+      );
+    }
+
+    setFilteredRegistrations(filtered);
   };
 
-  const handleViewDetails = (registration: Registration) => {
-    router.push(`/registration/confirmation/${registration.id}`);
+  const handleViewTicket = (registration: Registration) => {
+    setSelectedRegistration(registration);
+    setShowQRModal(true);
   };
 
-  const handleViewEvent = (eventId: string) => {
+  const handleViewEventDetails = (eventId: string) => {
     router.push(`/event/${eventId}`);
   };
 
-  const formatEventDate = (date: Date | string) => {
-    const eventDate = new Date(date);
-    return eventDate.toLocaleDateString('zh-TW', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      weekday: 'long'
-    });
+  const handleContactSupport = (registrationId: string) => {
+    Alert.alert(
+      '聯絡客服',
+      `關於訂單 ${registrationId}`,
+      [
+        { text: '取消', style: 'cancel' },
+        { text: '發送郵件', onPress: () => {
+          // Open email client
+        }}
+      ]
+    );
   };
 
-  const formatEventTime = (date: Date | string) => {
-    const eventDate = new Date(date);
-    return eventDate.toLocaleTimeString('zh-TW', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const isEventPast = (date: Date | string) => {
-    return new Date(date) < new Date();
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'paid': return '#48BB78';
+      case 'pending': return '#ED8936';
+      case 'cancelled': return '#E53E3E';
+      case 'checkedIn': return '#3182CE';
+      default: return '#718096';
+    }
   };
 
   const renderTicketCard = (registration: Registration) => {
-    const isPast = registration.event ? isEventPast(registration.event.startDate) : false;
-
+    const totalTickets = registrationService.calculateTotalTickets(registration.ticketSelections);
+    
     return (
-      <Card
-        key={registration.id}
-        bg={bgColor}
-        borderWidth={1}
-        borderColor={borderColor}
-        opacity={isPast ? 0.7 : 1}
-      >
-        <CardBody>
-          <VStack spacing={4} align="stretch">
-            <Flex justify="space-between" align="start">
-              <VStack align="stretch" flex={1} spacing={2}>
-                <Badge
-                  colorScheme={registrationService.getStatusColor(registration.status)}
-                  size="sm"
-                  alignSelf="flex-start"
-                >
-                  {registrationService.formatRegistrationStatus(registration.status)}
-                </Badge>
-                
-                <Heading as="h3" size="md" noOfLines={2}>
-                  {registration.event?.title || '載入中...'}
-                </Heading>
-                
-                {registration.event && (
-                  <VStack align="start" spacing={1}>
-                    <HStack>
-                      <Icon as={CalendarIcon} color="gray.500" boxSize={4} />
-                      <VStack align="start" spacing={0}>
-                        <Text fontSize="sm" color="gray.600">
-                          {formatEventDate(registration.event.startDate)}
-                        </Text>
-                        <Text fontSize="sm" color="gray.600">
-                          {formatEventTime(registration.event.startDate)}
-                        </Text>
-                      </VStack>
-                    </HStack>
-                    
-                    <Text fontSize="sm" color="gray.600" noOfLines={2}>
-                      📍 {registration.event.location}
-                    </Text>
-                  </VStack>
-                )}
-              </VStack>
+      <Card key={registration.id} containerStyle={styles.ticketCard}>
+        <TouchableOpacity
+          onPress={() => handleViewTicket(registration)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.ticketHeader}>
+            <View style={styles.ticketHeaderLeft}>
+              <Text style={styles.eventTitle}>
+                {(registration as any).eventTitle || 'Event'}
+              </Text>
+              <Text style={styles.eventDate}>
+                {new Date((registration as any).eventDate || registration.createdAt).toLocaleDateString('zh-TW')}
+              </Text>
+            </View>
+            <Badge
+              value={registrationService.formatRegistrationStatus(registration.status)}
+              badgeStyle={[
+                styles.statusBadge,
+                { backgroundColor: getStatusColor(registration.status) }
+              ]}
+            />
+          </View>
 
-              <Menu>
-                <MenuButton
-                  as={IconButton}
-                  icon={<MoreHorizontalIcon />}
-                  variant="ghost"
-                  size="sm"
+          <Divider style={styles.divider} />
+
+          <View style={styles.ticketBody}>
+            <View style={styles.ticketInfo}>
+              <Icon name="confirmation-number" type="material" size={16} color={colors.grey3} />
+              <Text style={styles.ticketInfoText}>
+                {registrationService.formatTicketSummary(registration.ticketSelections)}
+              </Text>
+            </View>
+            
+            <View style={styles.ticketInfo}>
+              <Icon name="receipt" type="material" size={16} color={colors.grey3} />
+              <Text style={styles.ticketInfoText}>
+                訂單編號: {registration.id.slice(0, 8).toUpperCase()}
+              </Text>
+            </View>
+
+            <View style={styles.ticketInfo}>
+              <Icon name="attach-money" type="material" size={16} color={colors.grey3} />
+              <Text style={styles.ticketInfoText}>
+                總金額: ${registration.finalAmount.toFixed(2)}
+              </Text>
+            </View>
+          </View>
+
+          <Divider style={styles.divider} />
+
+          <View style={styles.ticketActions}>
+            <Button
+              title="查看票券"
+              type="clear"
+              titleStyle={styles.actionButtonText}
+              icon={
+                <Icon
+                  name="qr-code"
+                  type="material"
+                  size={18}
+                  color={colors.primary}
+                  style={{ marginRight: 4 }}
                 />
-                <MenuList>
-                  <MenuItem
-                    icon={<ViewIcon />}
-                    onClick={() => handleViewDetails(registration)}
-                  >
-                    查看詳情
-                  </MenuItem>
-                  {registration.qrCode && (
-                    <MenuItem
-                      icon={<DownloadIcon />}
-                      onClick={() => handleDownloadQR(registration)}
-                    >
-                      下載 QR Code
-                    </MenuItem>
-                  )}
-                  {registration.event && (
-                    <MenuItem
-                      icon={<ExternalLinkIcon />}
-                      onClick={() => handleViewEvent(registration.event!.id)}
-                    >
-                      查看活動
-                    </MenuItem>
-                  )}
-                </MenuList>
-              </Menu>
-            </Flex>
+              }
+              onPress={() => handleViewTicket(registration)}
+            />
+            
+            <Button
+              title="活動詳情"
+              type="clear"
+              titleStyle={styles.actionButtonText}
+              icon={
+                <Icon
+                  name="info"
+                  type="material"
+                  size={18}
+                  color={colors.grey3}
+                  style={{ marginRight: 4 }}
+                />
+              }
+              onPress={() => handleViewEventDetails(registration.eventId)}
+            />
 
-            <Divider />
-
-            <HStack justify="space-between">
-              <VStack align="start" spacing={1}>
-                <Text fontSize="xs" color="gray.500">票券數量</Text>
-                <Text fontSize="sm" fontWeight="medium">
-                  {registrationService.formatTicketSummary(registration.ticketSelections)}
-                </Text>
-              </VStack>
-              
-              <VStack align="end" spacing={1}>
-                <Text fontSize="xs" color="gray.500">付款金額</Text>
-                <Text fontSize="sm" fontWeight="medium" color="green.600">
-                  NT$ {registration.finalAmount.toLocaleString()}
-                </Text>
-              </VStack>
-            </HStack>
-
-            {registration.qrCode && (
-              <Box p={3} bg={cardBgColor} borderRadius="md">
-                <HStack justify="space-between" align="center">
-                  <Image
-                    src={registration.qrCode}
-                    alt="QR Code"
-                    boxSize="60px"
-                    borderRadius="md"
+            {registration.status === 'pending' && (
+              <Button
+                title="繼續付款"
+                type="clear"
+                titleStyle={[styles.actionButtonText, { color: colors.warning }]}
+                icon={
+                  <Icon
+                    name="payment"
+                    type="material"
+                    size={18}
+                    color={colors.warning}
+                    style={{ marginRight: 4 }}
                   />
-                  <VStack align="end" spacing={1}>
-                    <Text fontSize="xs" color="gray.500">報名編號</Text>
-                    <Text fontSize="xs" fontFamily="mono" fontWeight="medium">
-                      {registration.id.substring(0, 8).toUpperCase()}
-                    </Text>
-                  </VStack>
-                </HStack>
-              </Box>
+                }
+                onPress={() => router.push(`/payment/${registration.id}` as any)}
+              />
             )}
-
-            {isPast && (
-              <Alert status="info" size="sm">
-                <AlertIcon />
-                <Text fontSize="sm">此活動已結束</Text>
-              </Alert>
-            )}
-          </VStack>
-        </CardBody>
+          </View>
+        </TouchableOpacity>
       </Card>
     );
   };
 
   if (isLoading) {
     return (
-      <Container maxW="6xl" py={8}>
-        <VStack spacing={6}>
-          <Heading as="h1" size="xl">
-            我的票券
-          </Heading>
-          <Center>
-            <VStack spacing={4}>
-              <Spinner size="xl" color="blue.500" />
-              <Text>載入票券中...</Text>
-            </VStack>
-          </Center>
-        </VStack>
-      </Container>
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>載入票券中...</Text>
+      </View>
     );
   }
 
-  if (error) {
+  if (error && !registrations.length) {
     return (
-      <Container maxW="6xl" py={8}>
-        <VStack spacing={6}>
-          <Heading as="h1" size="xl">
-            我的票券
-          </Heading>
-          <Alert status="error">
-            <AlertIcon />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-          <Button onClick={loadUserRegistrations}>
-            重新載入
-          </Button>
-        </VStack>
-      </Container>
+      <View style={styles.centerContainer}>
+        <Icon name="error" type="material" color={colors.error} size={48} />
+        <Text style={styles.errorText}>{error}</Text>
+        <Button
+          title="重試"
+          onPress={loadRegistrations}
+          buttonStyle={styles.retryButton}
+        />
+      </View>
     );
   }
-
-  if (registrations.length === 0) {
-    return (
-      <Container maxW="6xl" py={8}>
-        <VStack spacing={8}>
-          <Heading as="h1" size="xl">
-            我的票券
-          </Heading>
-          
-          <EmptyState
-            title="尚無票券"
-            description="您目前沒有任何活動票券"
-            action={
-              <Button
-                colorScheme="blue"
-                onClick={() => router.push('/events')}
-              >
-                瀏覽活動
-              </Button>
-            }
-          />
-        </VStack>
-      </Container>
-    );
-  }
-
-  const upcomingEvents = registrations.filter(r => 
-    r.event && !isEventPast(r.event.startDate)
-  );
-  const pastEvents = registrations.filter(r => 
-    r.event && isEventPast(r.event.startDate)
-  );
 
   return (
-    <Container maxW="6xl" py={8}>
-      <VStack spacing={8} align="stretch">
-        <HStack justify="space-between" align="center">
-          <Heading as="h1" size="xl">
-            我的票券
-          </Heading>
-          <Text color="gray.600">
-            共 {registrations.length} 張票券
-          </Text>
-        </HStack>
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text h4 style={styles.headerTitle}>我的票券</Text>
+        <TouchableOpacity
+          onPress={() => setFilterMenuVisible(true)}
+          style={styles.filterButton}
+        >
+          <Icon name="filter-list" type="material" size={24} color={colors.grey1} />
+        </TouchableOpacity>
+      </View>
 
-        {upcomingEvents.length > 0 && (
-          <VStack spacing={4} align="stretch">
-            <Heading as="h2" size="lg" color="blue.600">
-              即將舉行 ({upcomingEvents.length})
-            </Heading>
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
-              {upcomingEvents.map(renderTicketCard)}
-            </SimpleGrid>
-          </VStack>
-        )}
+      {/* Search Bar */}
+      <SearchBar
+        placeholder="搜尋活動或訂單編號..."
+        onChangeText={setSearchQuery}
+        value={searchQuery}
+        containerStyle={styles.searchContainer}
+        inputContainerStyle={styles.searchInputContainer}
+        lightTheme
+        round
+      />
 
-        {pastEvents.length > 0 && (
-          <VStack spacing={4} align="stretch">
-            <Heading as="h2" size="lg" color="gray.500">
-              已結束 ({pastEvents.length})
-            </Heading>
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
-              {pastEvents.map(renderTicketCard)}
-            </SimpleGrid>
-          </VStack>
+      {/* Status Filter */}
+      <ButtonGroup
+        onPress={(index) => setSelectedStatus(statusOptions[index])}
+        selectedIndex={statusOptions.indexOf(selectedStatus)}
+        buttons={statusLabels}
+        containerStyle={styles.statusFilter}
+        selectedButtonStyle={styles.selectedStatusButton}
+      />
+
+      {/* Tickets List */}
+      <ScrollView
+        style={styles.ticketsList}
+        contentContainerStyle={styles.ticketsListContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primary]}
+          />
+        }
+      >
+        {filteredRegistrations.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Icon
+              name="confirmation-number"
+              type="material"
+              size={64}
+              color={colors.grey4}
+            />
+            <Text style={styles.emptyStateTitle}>沒有找到票券</Text>
+            <Text style={styles.emptyStateDescription}>
+              {searchQuery || selectedStatus !== 'all' 
+                ? '嘗試調整搜尋條件或篩選器'
+                : '您還沒有購買任何活動票券'}
+            </Text>
+            {(!searchQuery && selectedStatus === 'all') && (
+              <Button
+                title="瀏覽活動"
+                onPress={() => router.push('/events')}
+                buttonStyle={styles.browseButton}
+              />
+            )}
+          </View>
+        ) : (
+          filteredRegistrations.map(renderTicketCard)
         )}
-      </VStack>
-    </Container>
+      </ScrollView>
+
+      {/* QR Code Modal */}
+      {selectedRegistration && (
+        <QRCodeModal
+          visible={showQRModal}
+          onClose={() => {
+            setShowQRModal(false);
+            setSelectedRegistration(null);
+          }}
+          registration={selectedRegistration}
+        />
+      )}
+
+      {/* Filter Menu Overlay */}
+      <Overlay
+        isVisible={filterMenuVisible}
+        onBackdropPress={() => setFilterMenuVisible(false)}
+        overlayStyle={styles.filterOverlay}
+      >
+        <View>
+          <Text h4 style={styles.filterTitle}>排序方式</Text>
+          <TouchableOpacity
+            style={styles.filterOption}
+            onPress={() => {
+              setSortBy('date');
+              setFilterMenuVisible(false);
+            }}
+          >
+            <Text style={styles.filterOptionText}>購買日期</Text>
+            {sortBy === 'date' && (
+              <Icon name="check" type="material" size={20} color={colors.primary} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.filterOption}
+            onPress={() => {
+              setSortBy('event');
+              setFilterMenuVisible(false);
+            }}
+          >
+            <Text style={styles.filterOptionText}>活動名稱</Text>
+            {sortBy === 'event' && (
+              <Icon name="check" type="material" size={20} color={colors.primary} />
+            )}
+          </TouchableOpacity>
+        </View>
+      </Overlay>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F7FAFC',
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2D3748',
+  },
+  filterButton: {
+    padding: 8,
+  },
+  searchContainer: {
+    backgroundColor: 'white',
+    borderTopWidth: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  searchInputContainer: {
+    backgroundColor: '#F7FAFC',
+  },
+  statusFilter: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    borderRadius: 8,
+  },
+  selectedStatusButton: {
+    backgroundColor: '#3182CE',
+  },
+  ticketsList: {
+    flex: 1,
+  },
+  ticketsListContent: {
+    padding: 16,
+  },
+  ticketCard: {
+    marginBottom: 16,
+    borderRadius: 8,
+    padding: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  ticketHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    padding: 16,
+  },
+  ticketHeaderLeft: {
+    flex: 1,
+  },
+  eventTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2D3748',
+    marginBottom: 4,
+  },
+  eventDate: {
+    fontSize: 14,
+    color: '#718096',
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  divider: {
+    marginVertical: 0,
+  },
+  ticketBody: {
+    padding: 16,
+  },
+  ticketInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  ticketInfoText: {
+    fontSize: 14,
+    color: '#4A5568',
+    marginLeft: 8,
+  },
+  ticketActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#F7FAFC',
+  },
+  actionButtonText: {
+    fontSize: 14,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2D3748',
+    marginTop: 16,
+  },
+  emptyStateDescription: {
+    fontSize: 14,
+    color: '#718096',
+    marginTop: 8,
+    textAlign: 'center',
+    paddingHorizontal: 40,
+  },
+  browseButton: {
+    marginTop: 24,
+    backgroundColor: '#3182CE',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 6,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#718096',
+  },
+  errorText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#E53E3E',
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 20,
+    backgroundColor: '#3182CE',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 6,
+  },
+  filterOverlay: {
+    width: '80%',
+    padding: 20,
+    borderRadius: 8,
+  },
+  filterTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+    color: '#2D3748',
+  },
+  filterOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  filterOptionText: {
+    fontSize: 16,
+    color: '#4A5568',
+  },
+});
 
 export default MyTicketsPage;

@@ -1,0 +1,10 @@
+{
+  "name": "jctop-event-client",
+  "build_command": "npm install",
+  "start_command": "npm run web",
+  "environment": {
+    "NODE_VERSION": "18",
+    "EXPO_PUBLIC_API_URL": "https://jctop.zeabur.app/api/v1",
+    "PORT": "3000"
+  }
+}

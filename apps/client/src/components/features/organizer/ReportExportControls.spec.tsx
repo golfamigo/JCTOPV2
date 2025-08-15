@@ -1,6 +1,5 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ChakraProvider } from '@chakra-ui/react';
 import { ReportExportControls } from './ReportExportControls';
 import { useReportStore } from '../../../stores/reportStore';
 import reportService from '../../../services/reportService';
@@ -15,10 +14,7 @@ const mockReportService = reportService as jest.Mocked<typeof reportService>;
 
 // Mock toast
 const mockToast = jest.fn();
-jest.mock('@chakra-ui/react', () => ({
-  ...jest.requireActual('@chakra-ui/react'),
-  useToast: () => mockToast,
-}));
+// Removed ChakraUI mock
 
 const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <ChakraProvider>{children}</ChakraProvider>

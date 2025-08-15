@@ -1,0 +1,43 @@
+const React = require('react');
+
+module.exports = {
+  ThemeProvider: ({ children }) => children,
+  useTheme: () => ({
+    theme: {
+      colors: {
+        primary: '#007BFF',
+        secondary: '#6C757D',
+        success: '#28A745',
+        warning: '#FFC107',
+        error: '#DC3545',
+        background: '#FFFFFF',
+        white: '#FFFFFF',
+        black: '#000000',
+        grey0: '#F8F9FA',
+        grey1: '#F8F9FA',
+        grey2: '#6C757D',
+        grey3: '#6C757D',
+        grey4: '#6C757D',
+        grey5: '#212529',
+        greyOutline: '#E9ECEF',
+      },
+    },
+    updateTheme: jest.fn(),
+    replaceTheme: jest.fn(),
+  }),
+  Button: 'Button',
+  Input: 'Input',
+  Text: 'Text',
+  Card: 'Card',
+  Overlay: 'Overlay',
+  CheckBox: 'CheckBox',
+  ListItem: 'ListItem',
+  LinearProgress: 'LinearProgress',
+  Icon: 'Icon',
+  Avatar: 'Avatar',
+  FAB: 'FAB',
+  Tab: 'Tab',
+  TabView: 'TabView',
+  Skeleton: 'Skeleton',
+  Divider: 'Divider',
+};

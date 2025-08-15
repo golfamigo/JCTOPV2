@@ -1,31 +1,34 @@
 import React, { useState } from 'react';
-import { ScrollView, View } from 'react-native';
-import { useColorModeValue } from '@chakra-ui/react';
+import { View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import EventsList from '../../components/features/event/EventsList';
+import { useAppTheme } from '@/theme';
+import { ErrorBoundary } from '../../components/organisms/ErrorBoundary';
 
 /**
  * Events Discovery Page Component
  * 
- * This page displays a list of all published events with pagination.
+ * This page displays a list of all published events with search and filtering.
  * It serves as the main discovery interface for attendees to find events.
  * 
  * Features:
  * - Displays published events in a responsive grid layout
- * - Includes pagination for efficient loading
+ * - Includes search functionality with debouncing
+ * - Category filtering with Traditional Chinese labels
+ * - Pull-to-refresh functionality
  * - Supports event favoriting (when authentication is implemented)
  * - Responsive design for mobile, tablet, and desktop
- * - Loading states and error handling
+ * - Loading states and error handling with localized messages
  * 
  * Route: app/(tabs)/events.tsx (for Expo Router integration)
  */
 export default function EventsPage() {
   const router = useRouter();
+  const { t } = useTranslation();
+  const { colors } = useAppTheme();
   const [favoritedEvents] = useState<Set<string>>(new Set());
-  
-  // Get theme colors for status bar
-  const statusBarStyle = useColorModeValue('dark', 'light');
   
   const handleEventClick = (eventId: string) => {
     // Navigate to registration page for the event
@@ -38,22 +41,18 @@ export default function EventsPage() {
   };
 
   return (
-    <View style={{ flex: 1 }}>
-      <StatusBar style={statusBarStyle} />
-      <ScrollView 
-        style={{ flex: 1 }}
-        contentContainerStyle={{ flexGrow: 1 }}
-        showsVerticalScrollIndicator={false}
-      >
+    <ErrorBoundary level="screen">
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <StatusBar style="dark" backgroundColor={colors.background} />
         <EventsList
           onEventClick={handleEventClick}
           onFavorite={handleFavorite}
           favoritedEvents={favoritedEvents}
-          title="Discover Events"
+          title={t('events.discoverEvents')}
           showTitle={true}
-          itemsPerPage={12}
-        />
-      </ScrollView>
-    </View>
+        itemsPerPage={12}
+      />
+      </View>
+    </ErrorBoundary>
   );
 }

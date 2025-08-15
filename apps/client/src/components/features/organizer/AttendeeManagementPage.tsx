@@ -1,83 +1,65 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Container,
-  VStack,
-  HStack,
-  Heading,
-  Text,
-  Input,
-  Select,
-  Button,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Badge,
+  View,
+  ScrollView,
+  StyleSheet,
+  RefreshControl,
   Alert,
-  AlertIcon,
-  Spinner,
-  Center,
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  useColorModeValue,
-  useToast,
-  IconButton,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
-  InputGroup,
-  InputLeftElement,
-  Flex,
-  Spacer,
+  ActivityIndicator,
+} from 'react-native';
+import {
+  Text,
+  Card,
+  Button,
+  SearchBar,
+  ListItem,
+  Badge,
+  Icon,
+  Header,
+  Divider,
   ButtonGroup,
-} from '@chakra-ui/react';
-import { 
-  ChevronRightIcon, 
-  SearchIcon, 
-  DownloadIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon as NextIcon,
-  ViewIcon
-} from '@chakra-ui/icons';
-import { useNavigate } from 'react-router-dom';
+} from '@rneui/themed';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import attendeeService, { AttendeeDto, AttendeeListResponse } from '../../../services/attendeeService';
 import eventService from '../../../services/eventService';
 import { Event } from '@jctop-event/shared-types';
+import { useAppTheme } from '@/theme';
 
 interface AttendeeManagementPageProps {
-  eventId: string;
+  eventId?: string;
   onNavigateBack?: () => void;
 }
 
 const AttendeeManagementPage: React.FC<AttendeeManagementPageProps> = ({
-  eventId,
+  eventId: propEventId,
   onNavigateBack,
 }) => {
-  const navigate = useNavigate();
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { colors, spacing } = useAppTheme();
+  
+  const eventId = propEventId || (route.params as any)?.eventId;
+  
   const [event, setEvent] = useState<Event | null>(null);
   const [attendeeData, setAttendeeData] = useState<AttendeeListResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   
   // Filter and search states
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [sortBy, setSortBy] = useState<'createdAt' | 'status' | 'userName' | 'finalAmount'>('createdAt');
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+  const [statusFilterIndex, setStatusFilterIndex] = useState(0);
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(20);
 
-  const bg = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.600');
-  const toast = useToast();
+  const statusOptions = ['All', 'Pending', 'Paid', 'Checked In', 'Cancelled'];
 
   useEffect(() => {
     loadEventDetails();
@@ -88,6 +70,8 @@ const AttendeeManagementPage: React.FC<AttendeeManagementPageProps> = ({
   }, [eventId, statusFilter, searchTerm, sortBy, sortOrder, currentPage]);
 
   const loadEventDetails = async () => {
+    if (!eventId) return;
+    
     try {
       const eventData = await eventService.getEventForUser(eventId);
       setEvent(eventData);
@@ -98,12 +82,14 @@ const AttendeeManagementPage: React.FC<AttendeeManagementPageProps> = ({
   };
 
   const loadAttendees = async () => {
+    if (!eventId) return;
+    
     try {
       setIsLoading(true);
       setError(null);
       
       const params = {
-        status: statusFilter || undefined,
+        status: statusFilter ? statusFilter as ('pending' | 'paid' | 'cancelled' | 'checkedIn') : undefined,
         search: searchTerm || undefined,
         sortBy,
         sortOrder,
@@ -118,17 +104,25 @@ const AttendeeManagementPage: React.FC<AttendeeManagementPageProps> = ({
       setError(error instanceof Error ? error.message : 'Failed to load attendees');
     } finally {
       setIsLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadAttendees();
   };
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
-    setCurrentPage(1); // Reset to first page on search
+    setCurrentPage(1);
   };
 
-  const handleStatusFilter = (value: string) => {
-    setStatusFilter(value);
-    setCurrentPage(1); // Reset to first page on filter
+  const handleStatusFilter = (index: number) => {
+    setStatusFilterIndex(index);
+    const status = index === 0 ? '' : statusOptions[index].toLowerCase().replace(' ', '_');
+    setStatusFilter(status);
+    setCurrentPage(1);
   };
 
   const handleSort = (field: typeof sortBy) => {
@@ -144,391 +138,396 @@ const AttendeeManagementPage: React.FC<AttendeeManagementPageProps> = ({
   const handleExport = async (format: 'csv' | 'excel') => {
     try {
       setIsExporting(true);
-      await attendeeService.exportEventAttendees(eventId, {
+      
+      // Map status filter to expected type
+      let mappedStatus: 'pending' | 'paid' | 'cancelled' | 'checkedIn' | undefined;
+      if (statusFilter) {
+        const statusMap: Record<string, 'pending' | 'paid' | 'cancelled' | 'checkedIn'> = {
+          'pending': 'pending',
+          'paid': 'paid',
+          'cancelled': 'cancelled',
+          'checked_in': 'checkedIn',
+          'checkedIn': 'checkedIn',
+        };
+        mappedStatus = statusMap[statusFilter.toLowerCase()];
+      }
+      
+      await attendeeService.exportEventAttendees(eventId!, {
         format,
-        status: statusFilter || undefined,
+        status: mappedStatus,
         search: searchTerm || undefined,
       });
       
-      toast({
-        title: 'Export successful',
-        description: `Attendee list exported as ${format.toUpperCase()}`,
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
+      Alert.alert(
+        'Export Successful',
+        `Attendee list exported as ${format.toUpperCase()}`,
+        [{ text: 'OK' }]
+      );
     } catch (error) {
-      console.error('Export failed:', error);
-      toast({
-        title: 'Export failed',
-        description: error instanceof Error ? error.message : 'Failed to export attendees',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      Alert.alert(
+        'Export Failed',
+        error instanceof Error ? error.message : 'Failed to export attendees',
+        [{ text: 'OK' }]
+      );
     } finally {
       setIsExporting(false);
     }
   };
 
-  const handleEnterCheckInMode = () => {
-    navigate(`/organizer/events/${eventId}/checkin`);
+  const handleAttendeeAction = async (attendee: AttendeeDto, action: string) => {
+    switch (action) {
+      case 'resend':
+        await attendeeService.resendTicket(eventId!, attendee.id);
+        Alert.alert('Success', 'Ticket resent successfully');
+        break;
+      case 'checkIn':
+        await attendeeService.checkInAttendee(eventId!, attendee.id);
+        loadAttendees();
+        break;
+      case 'cancel':
+        Alert.alert(
+          'Cancel Registration',
+          'Are you sure you want to cancel this registration?',
+          [
+            { text: 'No', style: 'cancel' },
+            { 
+              text: 'Yes', 
+              style: 'destructive',
+              onPress: async () => {
+                await attendeeService.cancelRegistration(eventId!, attendee.id);
+                loadAttendees();
+              }
+            }
+          ]
+        );
+        break;
+    }
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case 'paid':
-        return 'green';
+        return colors.success;
       case 'pending':
-        return 'yellow';
+        return colors.warning;
+      case 'checked_in':
+        return colors.primary;
       case 'cancelled':
-        return 'red';
-      case 'checkedIn':
-        return 'blue';
+        return colors.error;
       default:
-        return 'gray';
+        return colors.grey3;
     }
   };
 
-  const getPaymentStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'green';
-      case 'pending':
-        return 'yellow';
-      case 'processing':
-        return 'blue';
-      case 'failed':
-        return 'red';
-      case 'cancelled':
-        return 'gray';
-      default:
-        return 'gray';
-    }
-  };
+  const renderAttendee = (attendee: AttendeeDto) => (
+    <ListItem.Swipeable
+      key={attendee.id}
+      bottomDivider
+      leftContent={(reset) => (
+        <Button
+          title="Check In"
+          onPress={() => {
+            reset();
+            handleAttendeeAction(attendee, 'checkIn');
+          }}
+          icon={{ name: 'check', type: 'material', color: 'white' }}
+          buttonStyle={{ minHeight: '100%', backgroundColor: colors.success }}
+        />
+      )}
+      rightContent={(reset) => (
+        <Button
+          title="Cancel"
+          onPress={() => {
+            reset();
+            handleAttendeeAction(attendee, 'cancel');
+          }}
+          icon={{ name: 'close', type: 'material', color: 'white' }}
+          buttonStyle={{ minHeight: '100%', backgroundColor: colors.error }}
+        />
+      )}
+    >
+      <ListItem.Content>
+        <View style={styles.attendeeRow}>
+          <View style={styles.attendeeInfo}>
+            <Text style={styles.attendeeName}>{attendee.userName}</Text>
+            <Text style={styles.attendeeEmail}>{attendee.userEmail}</Text>
+            <View style={styles.attendeeDetails}>
+              <Badge
+                value={attendee.status}
+                badgeStyle={[styles.statusBadge, { backgroundColor: getStatusColor(attendee.status) }]}
+                textStyle={styles.badgeText}
+              />
+              <Text style={styles.ticketType}>{attendee.ticketSelections?.[0]?.ticketTypeId || 'N/A'}</Text>
+              <Text style={styles.amount}>NT$ {attendee.finalAmount}</Text>
+            </View>
+          </View>
+          <Icon
+            name="more-vert"
+            type="material"
+            color={colors.grey3}
+            onPress={() => {
+              Alert.alert(
+                'Actions',
+                'Choose an action',
+                [
+                  { text: 'Resend Ticket', onPress: () => handleAttendeeAction(attendee, 'resend') },
+                  { text: 'Check In', onPress: () => handleAttendeeAction(attendee, 'checkIn') },
+                  { text: 'Cancel', onPress: () => handleAttendeeAction(attendee, 'cancel'), style: 'destructive' },
+                  { text: 'Close', style: 'cancel' }
+                ]
+              );
+            }}
+          />
+        </View>
+      </ListItem.Content>
+    </ListItem.Swipeable>
+  );
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
-  if (error) {
+  if (!eventId) {
     return (
-      <Container maxW="6xl" py={8}>
-        <Alert status="error">
-          <AlertIcon />
-          {error}
-        </Alert>
-      </Container>
+      <View style={styles.container}>
+        <Text style={styles.errorText}>No event ID provided</Text>
+      </View>
     );
   }
 
   return (
-    <Container maxW="7xl" py={6}>
-      <VStack align="stretch" spacing={6}>
-        {/* Breadcrumb */}
-        <Breadcrumb spacing="8px" separator={<ChevronRightIcon color="gray.500" />}>
-          <BreadcrumbItem>
-            <BreadcrumbLink onClick={onNavigateBack} cursor="pointer">
-              Event Management
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbItem isCurrentPage>
-            <BreadcrumbLink>Attendee Management</BreadcrumbLink>
-          </BreadcrumbItem>
-        </Breadcrumb>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Header
+        leftComponent={
+          <Icon
+            name="arrow-back"
+            type="material"
+            color={colors.white}
+            onPress={() => onNavigateBack ? onNavigateBack() : navigation.goBack()}
+          />
+        }
+        centerComponent={{ text: 'Attendee Management', style: { color: colors.white } }}
+        rightComponent={
+          <Icon
+            name="file-download"
+            type="material"
+            color={colors.white}
+            onPress={() => {
+              Alert.alert(
+                'Export Format',
+                'Choose export format',
+                [
+                  { text: 'CSV', onPress: () => handleExport('csv') },
+                  { text: 'Excel', onPress: () => handleExport('excel') },
+                  { text: 'Cancel', style: 'cancel' }
+                ]
+              );
+            }}
+          />
+        }
+        backgroundColor={colors.primary}
+      />
 
-        {/* Header */}
-        <Box
-          p={6}
-          bg={bg}
-          borderWidth={1}
-          borderColor={borderColor}
-          borderRadius="lg"
-          shadow="sm"
-        >
-          <VStack align="stretch" spacing={4}>
-            <HStack justify="space-between" align="flex-start">
-              <VStack align="flex-start" spacing={1}>
-                <Heading size="lg">Attendee Management</Heading>
-                <Text color="gray.600">
-                  {event?.title || 'Loading event...'}
-                </Text>
-              </VStack>
-              
-              <HStack spacing={3}>
-                <Button
-                  leftIcon={<ViewIcon />}
-                  colorScheme="primary"
-                  variant="solid"
-                  onClick={handleEnterCheckInMode}
-                  size="md"
-                >
-                  Enter Check-in Mode
-                </Button>
-                
-                <Menu>
-                  <MenuButton
-                    as={Button}
-                    leftIcon={<DownloadIcon />}
-                    colorScheme="blue"
-                    variant="outline"
-                    isLoading={isExporting}
-                    loadingText="Exporting..."
-                  >
-                    Export
-                  </MenuButton>
-                  <MenuList>
-                    <MenuItem onClick={() => handleExport('csv')}>
-                      Export as CSV
-                    </MenuItem>
-                    <MenuItem onClick={() => handleExport('excel')}>
-                      Export as Excel
-                    </MenuItem>
-                  </MenuList>
-                </Menu>
-              </HStack>
-            </HStack>
+      {event && (
+        <Card containerStyle={styles.eventCard}>
+          <Text h4>{event.title}</Text>
+          <Text style={styles.eventDetails}>
+            {new Date(event.startDate).toLocaleDateString()} • {(event as any).venue?.name || event.location}
+          </Text>
+        </Card>
+      )}
 
-            {/* Summary Stats */}
-            {attendeeData && (
-              <HStack spacing={8}>
-                <VStack align="flex-start" spacing={1}>
-                  <Text fontSize="sm" color="gray.500" fontWeight="medium">
-                    Total Attendees
-                  </Text>
-                  <Text fontSize="2xl" fontWeight="bold">
-                    {attendeeData.total}
-                  </Text>
-                </VStack>
-                <VStack align="flex-start" spacing={1}>
-                  <Text fontSize="sm" color="gray.500" fontWeight="medium">
-                    Current Page
-                  </Text>
-                  <Text fontSize="lg" fontWeight="semibold">
-                    {attendeeData.page} of {attendeeData.totalPages}
-                  </Text>
-                </VStack>
-              </HStack>
-            )}
-          </VStack>
-        </Box>
+      <View style={styles.filters}>
+        <SearchBar
+          placeholder="Search by name or email..."
+          onChangeText={handleSearch}
+          value={searchTerm}
+          platform="default"
+          containerStyle={styles.searchBar}
+          inputContainerStyle={styles.searchInput}
+        />
+        
+        <ButtonGroup
+          buttons={statusOptions}
+          selectedIndex={statusFilterIndex}
+          onPress={handleStatusFilter}
+          containerStyle={styles.filterButtons}
+        />
+      </View>
 
-        {/* Filters and Search */}
-        <Box
-          p={4}
-          bg={bg}
-          borderWidth={1}
-          borderColor={borderColor}
-          borderRadius="lg"
-        >
-          <HStack spacing={4} wrap="wrap">
-            <Box minW="300px">
-              <InputGroup>
-                <InputLeftElement pointerEvents="none">
-                  <SearchIcon color="gray.300" />
-                </InputLeftElement>
-                <Input 
-                  placeholder="Search by name or email..."
-                  value={searchTerm}
-                  onChange={(e) => handleSearch(e.target.value)}
-                />
-              </InputGroup>
-            </Box>
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primary]}
+          />
+        }
+      >
+        {isLoading && !refreshing ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Loading attendees...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Icon name="error-outline" type="material" color={colors.error} size={48} />
+            <Text style={styles.errorText}>{error}</Text>
+            <Button
+              title="Retry"
+              onPress={loadAttendees}
+              buttonStyle={[styles.retryButton, { backgroundColor: colors.primary }]}
+            />
+          </View>
+        ) : attendeeData && attendeeData.attendees.length > 0 ? (
+          <>
+            {attendeeData.attendees.map(renderAttendee)}
             
-            <Select 
-              placeholder="All Statuses" 
-              value={statusFilter}
-              onChange={(e) => handleStatusFilter(e.target.value)}
-              w="200px"
-            >
-              <option value="pending">Pending</option>
-              <option value="paid">Paid</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="checkedIn">Checked In</option>
-            </Select>
-
-            <Spacer />
-
-            <ButtonGroup size="sm" isAttached variant="outline">
-              <Button 
-                onClick={() => handleSort('createdAt')}
-                colorScheme={sortBy === 'createdAt' ? 'blue' : 'gray'}
-              >
-                Date {sortBy === 'createdAt' && (sortOrder === 'ASC' ? '↑' : '↓')}
-              </Button>
-              <Button 
-                onClick={() => handleSort('userName')}
-                colorScheme={sortBy === 'userName' ? 'blue' : 'gray'}
-              >
-                Name {sortBy === 'userName' && (sortOrder === 'ASC' ? '↑' : '↓')}
-              </Button>
-              <Button 
-                onClick={() => handleSort('status')}
-                colorScheme={sortBy === 'status' ? 'blue' : 'gray'}
-              >
-                Status {sortBy === 'status' && (sortOrder === 'ASC' ? '↑' : '↓')}
-              </Button>
-              <Button 
-                onClick={() => handleSort('finalAmount')}
-                colorScheme={sortBy === 'finalAmount' ? 'blue' : 'gray'}
-              >
-                Amount {sortBy === 'finalAmount' && (sortOrder === 'ASC' ? '↑' : '↓')}
-              </Button>
-            </ButtonGroup>
-          </HStack>
-        </Box>
-
-        {/* Attendees Table */}
-        <Box
-          bg={bg}
-          borderWidth={1}
-          borderColor={borderColor}
-          borderRadius="lg"
-          overflow="hidden"
-        >
-          {isLoading ? (
-            <Center py={12}>
-              <VStack spacing={4}>
-                <Spinner size="lg" />
-                <Text>Loading attendees...</Text>
-              </VStack>
-            </Center>
-          ) : attendeeData?.attendees.length === 0 ? (
-            <Center py={12}>
-              <VStack spacing={4}>
-                <Text fontSize="lg" color="gray.500">
-                  No attendees found
+            {attendeeData.totalPages > 1 && (
+              <View style={styles.pagination}>
+                <Button
+                  title="Previous"
+                  disabled={currentPage === 1}
+                  onPress={() => setCurrentPage(currentPage - 1)}
+                  type="outline"
+                />
+                <Text style={styles.pageInfo}>
+                  Page {currentPage} of {attendeeData.totalPages}
                 </Text>
-                <Text fontSize="sm" color="gray.400">
-                  {statusFilter || searchTerm 
-                    ? 'Try adjusting your filters or search terms'
-                    : 'No one has registered for this event yet'
-                  }
-                </Text>
-              </VStack>
-            </Center>
-          ) : (
-            <>
-              <Table variant="simple">
-                <Thead>
-                  <Tr>
-                    <Th>Name</Th>
-                    <Th>Email</Th>
-                    <Th>Status</Th>
-                    <Th>Payment</Th>
-                    <Th isNumeric>Amount</Th>
-                    <Th>Registration Date</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {attendeeData?.attendees.map((attendee) => (
-                    <Tr key={attendee.id}>
-                      <Td>
-                        <VStack align="flex-start" spacing={1}>
-                          <Text fontWeight="semibold">{attendee.userName}</Text>
-                          {attendee.userPhone && (
-                            <Text fontSize="sm" color="gray.500">
-                              {attendee.userPhone}
-                            </Text>
-                          )}
-                        </VStack>
-                      </Td>
-                      <Td>
-                        <Text fontSize="sm">{attendee.userEmail}</Text>
-                      </Td>
-                      <Td>
-                        <Badge
-                          colorScheme={getStatusColor(attendee.status)}
-                          variant="subtle"
-                          textTransform="capitalize"
-                        >
-                          {attendee.status}
-                        </Badge>
-                      </Td>
-                      <Td>
-                        <Badge
-                          colorScheme={getPaymentStatusColor(attendee.paymentStatus)}
-                          variant="subtle"
-                          textTransform="capitalize"
-                        >
-                          {attendee.paymentStatus}
-                        </Badge>
-                      </Td>
-                      <Td isNumeric>
-                        <VStack align="flex-end" spacing={0}>
-                          <Text fontWeight="semibold">
-                            {formatCurrency(attendee.finalAmount)}
-                          </Text>
-                          {attendee.discountAmount > 0 && (
-                            <Text fontSize="xs" color="green.500">
-                              -{formatCurrency(attendee.discountAmount)} discount
-                            </Text>
-                          )}
-                        </VStack>
-                      </Td>
-                      <Td>
-                        <Text fontSize="sm">
-                          {formatDate(attendee.createdAt)}
-                        </Text>
-                      </Td>
-                    </Tr>
-                  ))}
-                </Tbody>
-              </Table>
-
-              {/* Pagination */}
-              {attendeeData && attendeeData.totalPages > 1 && (
-                <Flex p={4} justify="space-between" align="center">
-                  <Text fontSize="sm" color="gray.600">
-                    Showing {((currentPage - 1) * pageSize) + 1} to{' '}
-                    {Math.min(currentPage * pageSize, attendeeData.total)} of{' '}
-                    {attendeeData.total} attendees
-                  </Text>
-                  
-                  <HStack spacing={2}>
-                    <IconButton
-                      aria-label="Previous page"
-                      icon={<ChevronLeftIcon />}
-                      size="sm"
-                      isDisabled={currentPage === 1}
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    />
-                    
-                    <Text fontSize="sm">
-                      Page {currentPage} of {attendeeData.totalPages}
-                    </Text>
-                    
-                    <IconButton
-                      aria-label="Next page"
-                      icon={<NextIcon />}
-                      size="sm"
-                      isDisabled={currentPage === attendeeData.totalPages}
-                      onClick={() => setCurrentPage(prev => 
-                        Math.min(attendeeData.totalPages, prev + 1)
-                      )}
-                    />
-                  </HStack>
-                </Flex>
-              )}
-            </>
-          )}
-        </Box>
-      </VStack>
-    </Container>
+                <Button
+                  title="Next"
+                  disabled={currentPage === attendeeData.totalPages}
+                  onPress={() => setCurrentPage(currentPage + 1)}
+                  type="outline"
+                />
+              </View>
+            )}
+          </>
+        ) : (
+          <View style={styles.emptyContainer}>
+            <Icon name="people-outline" type="material" color={colors.grey3} size={64} />
+            <Text style={styles.emptyText}>No attendees found</Text>
+          </View>
+        )}
+      </ScrollView>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  eventCard: {
+    margin: 10,
+    borderRadius: 8,
+  },
+  eventDetails: {
+    marginTop: 5,
+    fontSize: 14,
+    color: '#666',
+  },
+  filters: {
+    padding: 10,
+  },
+  searchBar: {
+    backgroundColor: 'transparent',
+    borderTopWidth: 0,
+    borderBottomWidth: 0,
+    paddingHorizontal: 0,
+  },
+  searchInput: {
+    backgroundColor: '#f5f5f5',
+  },
+  filterButtons: {
+    marginTop: 10,
+    borderRadius: 8,
+  },
+  attendeeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  attendeeInfo: {
+    flex: 1,
+  },
+  attendeeName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  attendeeEmail: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
+  },
+  attendeeDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+    gap: 10,
+  },
+  statusBadge: {
+    borderRadius: 4,
+  },
+  badgeText: {
+    fontSize: 12,
+  },
+  ticketType: {
+    fontSize: 14,
+    color: '#666',
+  },
+  amount: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 50,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 50,
+  },
+  errorText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#ff0000',
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 20,
+    paddingHorizontal: 30,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 50,
+  },
+  emptyText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  pagination: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+  },
+  pageInfo: {
+    fontSize: 14,
+    color: '#666',
+  },
+});
 
 export default AttendeeManagementPage;

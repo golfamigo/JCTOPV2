@@ -1,16 +1,8 @@
 import React from 'react';
-import {
-  Input,
-  Textarea,
-  Select,
-  Checkbox,
-  NumberInput,
-  NumberInputField,
-  FormControl,
-  FormLabel,
-  FormErrorMessage,
-  useColorModeValue,
-} from '@chakra-ui/react';
+import { View, StyleSheet, TextInput, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { Input, Text, CheckBox, Icon } from '@rneui/themed';
+import { Picker } from '@react-native-picker/picker';
+import { useAppTheme } from '@/theme';
 import { CustomRegistrationField } from '@jctop-event/shared-types';
 
 interface DynamicFieldRendererProps {
@@ -28,11 +20,7 @@ const DynamicFieldRenderer: React.FC<DynamicFieldRendererProps> = ({
   error,
   isDisabled = false,
 }) => {
-  // Design system colors following branding guide
-  const borderColor = useColorModeValue('#E2E8F0', '#475569');
-  const errorColor = '#EF4444';
-  const focusColor = '#2563EB';
-  const neutralMedium = '#64748B';
+  const { colors, spacing, typography } = useAppTheme();
 
   const renderField = () => {
     switch (field.fieldType) {
@@ -41,95 +29,128 @@ const DynamicFieldRenderer: React.FC<DynamicFieldRendererProps> = ({
           <Input
             placeholder={field.placeholder}
             value={value || ''}
-            onChange={(e) => onChange(e.target.value)}
-            isInvalid={!!error}
-            isDisabled={isDisabled}
-            borderColor={borderColor}
-            focusBorderColor={focusColor}
-            _placeholder={{ color: neutralMedium }}
+            onChangeText={onChange}
+            errorMessage={error}
+            disabled={isDisabled}
+            containerStyle={styles.inputContainer}
+            inputStyle={styles.input}
+            errorStyle={styles.errorText}
+            placeholderTextColor={colors.midGrey}
           />
         );
 
       case 'email':
         return (
           <Input
-            type="email"
+            keyboardType="email-address"
+            autoCapitalize="none"
             placeholder={field.placeholder}
             value={value || ''}
-            onChange={(e) => onChange(e.target.value)}
-            isInvalid={!!error}
-            isDisabled={isDisabled}
-            borderColor={borderColor}
-            focusBorderColor={focusColor}
-            _placeholder={{ color: neutralMedium }}
+            onChangeText={onChange}
+            errorMessage={error}
+            disabled={isDisabled}
+            containerStyle={styles.inputContainer}
+            inputStyle={styles.input}
+            errorStyle={styles.errorText}
+            placeholderTextColor={colors.midGrey}
           />
         );
 
       case 'number':
         return (
-          <NumberInput
-            value={value || ''}
-            onChange={(valueString) => onChange(valueString)}
-            isInvalid={!!error}
-            isDisabled={isDisabled}
-          >
-            <NumberInputField
-              placeholder={field.placeholder}
-              borderColor={borderColor}
-              focusBorderColor={focusColor}
-              _placeholder={{ color: neutralMedium }}
-            />
-          </NumberInput>
+          <Input
+            keyboardType="numeric"
+            placeholder={field.placeholder}
+            value={value ? String(value) : ''}
+            onChangeText={(text) => {
+              const numValue = text.replace(/[^0-9]/g, '');
+              onChange(numValue ? parseInt(numValue, 10) : '');
+            }}
+            errorMessage={error}
+            disabled={isDisabled}
+            containerStyle={styles.inputContainer}
+            inputStyle={styles.input}
+            errorStyle={styles.errorText}
+            placeholderTextColor={colors.midGrey}
+          />
         );
 
       case 'textarea':
         return (
-          <Textarea
-            placeholder={field.placeholder}
-            value={value || ''}
-            onChange={(e) => onChange(e.target.value)}
-            isInvalid={!!error}
-            isDisabled={isDisabled}
-            borderColor={borderColor}
-            focusBorderColor={focusColor}
-            _placeholder={{ color: neutralMedium }}
-            resize="vertical"
-            minH="100px"
-          />
+          <View>
+            <TextInput
+              multiline
+              numberOfLines={4}
+              placeholder={field.placeholder}
+              value={value || ''}
+              onChangeText={onChange}
+              editable={!isDisabled}
+              style={[
+                styles.textArea,
+                error ? styles.textAreaError : {},
+                isDisabled ? styles.disabledInput : {},
+              ]}
+              placeholderTextColor={colors.midGrey}
+              textAlignVertical="top"
+            />
+            {error && (
+              <Text style={styles.errorText}>{error}</Text>
+            )}
+          </View>
         );
 
       case 'select':
         return (
-          <Select
-            placeholder={field.placeholder || 'Select an option'}
-            value={value || ''}
-            onChange={(e) => onChange(e.target.value)}
-            isInvalid={!!error}
-            isDisabled={isDisabled}
-            borderColor={borderColor}
-            focusBorderColor={focusColor}
-            _placeholder={{ color: neutralMedium }}
-          >
-            {field.options?.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </Select>
+          <View>
+            <View style={[
+              styles.pickerContainer,
+              error ? styles.pickerError : {},
+              isDisabled ? styles.disabledInput : {},
+            ]}>
+              <Picker
+                selectedValue={value || ''}
+                onValueChange={onChange}
+                enabled={!isDisabled}
+                style={styles.picker}
+              >
+                <Picker.Item 
+                  label={field.placeholder || 'Select an option'} 
+                  value="" 
+                  color={colors.midGrey}
+                />
+                {field.options?.map((option) => (
+                  <Picker.Item 
+                    key={option} 
+                    label={option} 
+                    value={option}
+                    color={colors.text}
+                  />
+                ))}
+              </Picker>
+            </View>
+            {error && (
+              <Text style={styles.errorText}>{error}</Text>
+            )}
+          </View>
         );
 
       case 'checkbox':
         return (
-          <Checkbox
-            isChecked={!!value}
-            onChange={(e) => onChange(e.target.checked)}
-            isInvalid={!!error}
-            isDisabled={isDisabled}
-            colorScheme="blue"
-            size="md"
-          >
-            {field.label}
-          </Checkbox>
+          <View>
+            <CheckBox
+              checked={!!value}
+              onPress={() => !isDisabled && onChange(!value)}
+              disabled={isDisabled}
+              title={field.label}
+              checkedColor={colors.primary}
+              uncheckedColor={colors.midGrey}
+              containerStyle={styles.checkboxContainer}
+              textStyle={[styles.checkboxText, isDisabled && styles.disabledText]}
+            />
+            {error && (
+              <Text style={[styles.errorText, { marginLeft: spacing.md }]}>{error}</Text>
+            )}
+          </View>
         );
 
       default:
@@ -137,30 +158,93 @@ const DynamicFieldRenderer: React.FC<DynamicFieldRendererProps> = ({
     }
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      marginBottom: spacing.md,
+    },
+    label: {
+      ...typography.body,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: spacing.xs,
+    },
+    requiredMark: {
+      color: colors.danger,
+      marginLeft: 4,
+    },
+    inputContainer: {
+      paddingHorizontal: 0,
+    },
+    input: {
+      ...typography.body,
+      color: colors.text,
+    },
+    textArea: {
+      ...typography.body,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      padding: spacing.sm,
+      minHeight: 100,
+      color: colors.text,
+      backgroundColor: colors.white,
+    },
+    textAreaError: {
+      borderColor: colors.danger,
+    },
+    pickerContainer: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      backgroundColor: colors.white,
+      overflow: 'hidden',
+    },
+    pickerError: {
+      borderColor: colors.danger,
+    },
+    picker: {
+      height: 50,
+      color: colors.text,
+    },
+    checkboxContainer: {
+      backgroundColor: 'transparent',
+      borderWidth: 0,
+      marginLeft: 0,
+      marginRight: 0,
+      paddingLeft: 0,
+    },
+    checkboxText: {
+      ...typography.body,
+      color: colors.text,
+      fontWeight: 'normal',
+    },
+    disabledInput: {
+      backgroundColor: colors.lightGrey,
+      opacity: 0.7,
+    },
+    disabledText: {
+      color: colors.midGrey,
+    },
+    errorText: {
+      ...typography.small,
+      color: colors.danger,
+      marginTop: spacing.xs,
+    },
+  });
+
   return (
-    <FormControl isInvalid={!!error} isRequired={field.required}>
+    <View style={styles.container}>
       {field.fieldType !== 'checkbox' && (
-        <FormLabel 
-          htmlFor={field.id}
-          color={neutralMedium}
-          fontWeight="semibold"
-          fontSize="sm"
-        >
+        <Text style={styles.label}>
           {field.label}
           {field.required && (
-            <span style={{ color: errorColor, marginLeft: '4px' }}>*</span>
+            <Text style={styles.requiredMark}>*</Text>
           )}
-        </FormLabel>
+        </Text>
       )}
       
       {renderField()}
-      
-      {error && (
-        <FormErrorMessage color={errorColor} fontSize="sm">
-          {error}
-        </FormErrorMessage>
-      )}
-    </FormControl>
+    </View>
   );
 };
 

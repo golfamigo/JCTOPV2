@@ -1,30 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ScrollView, View, StyleSheet, Alert, Dimensions, ActivityIndicator } from 'react-native';
+import { Card, Text, Button, Icon, Badge, LinearProgress } from '@rneui/themed';
 import { useRouter } from 'expo-router';
-import {
-  Box,
-  VStack,
-  HStack,
-  Button,
-  Text,
-  Heading,
-  Alert,
-  AlertIcon,
-  AlertDescription,
-  useColorModeValue,
-  Container,
-  Card,
-  CardBody,
-  useToast,
-  Divider,
-  Spinner,
-  Center,
-  Icon,
-  Badge,
-  Progress,
-} from '@chakra-ui/react';
-import { CheckIcon, WarningIcon, InfoIcon, ArrowForwardIcon } from '@chakra-ui/icons';
+import { useTranslation } from 'react-i18next';
 import { PaymentStatusResponse } from '@jctop-event/shared-types';
 import paymentService from '../../../services/paymentService';
+import { useAppTheme } from '@/theme';
 
 interface PaymentStatusPageProps {
   paymentId: string;
@@ -41,20 +22,29 @@ const PaymentStatusPage: React.FC<PaymentStatusPageProps> = ({
   onFailure,
   onCancel,
 }) => {
+  const { t } = useTranslation();
+  const { colors, spacing, typography } = useAppTheme();
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatusResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pollingCount, setPollingCount] = useState(0);
   const router = useRouter();
-  const toast = useToast();
+  const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const bgColor = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const windowWidth = Dimensions.get('window').width;
+  const isTablet = windowWidth >= 768;
 
   useEffect(() => {
     if (paymentId) {
       startStatusPolling();
     }
+
+    return () => {
+      // Cleanup timeout on unmount
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+      }
+    };
   }, [paymentId]);
 
   const startStatusPolling = () => {
@@ -77,14 +67,14 @@ const PaymentStatusPage: React.FC<PaymentStatusPageProps> = ({
         // Continue polling if not in final state and under max polls
         pollCount++;
         if (pollCount < maxPolls) {
-          setTimeout(poll, 3000); // Poll every 3 seconds
+          pollTimeoutRef.current = setTimeout(poll, 3000); // Poll every 3 seconds
         } else {
           // Timeout reached
-          setError('付款狀態檢查超時，請手動重新整理頁面');
+          setError(t('payment.statusCheckTimeout'));
         }
       } catch (err: any) {
         console.error('Error polling payment status:', err);
-        setError(err.message || '無法取得付款狀態');
+        setError(err.message || t('payment.cannotGetStatus'));
         setIsLoading(false);
       }
     };
@@ -95,13 +85,11 @@ const PaymentStatusPage: React.FC<PaymentStatusPageProps> = ({
   const handleFinalStatus = (status: PaymentStatusResponse) => {
     switch (status.status) {
       case 'completed':
-        toast({
-          title: '付款成功！',
-          description: '您的付款已成功處理，報名完成。',
-          status: 'success',
-          duration: 5000,
-          isClosable: true,
-        });
+        Alert.alert(
+          t('payment.paymentSuccessful'),
+          t('payment.paymentSuccessDescription'),
+          [{ text: t('common.confirm'), style: 'default' }]
+        );
         // Redirect to confirmation page if payment is for an event registration
         if (status.payment.resourceType === 'event') {
           router.push(`/registration/confirmation/${status.payment.id}`);
@@ -111,35 +99,29 @@ const PaymentStatusPage: React.FC<PaymentStatusPageProps> = ({
         break;
       
       case 'failed':
-        toast({
-          title: '付款失敗',
-          description: '付款處理失敗，請重新嘗試。',
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        });
+        Alert.alert(
+          t('payment.paymentFailed'),
+          t('payment.paymentFailedDescription'),
+          [{ text: t('common.confirm'), style: 'default' }]
+        );
         if (onFailure) onFailure();
         break;
       
       case 'cancelled':
-        toast({
-          title: '付款已取消',
-          description: '您已取消付款流程。',
-          status: 'warning',
-          duration: 5000,
-          isClosable: true,
-        });
+        Alert.alert(
+          t('payment.paymentCancelled'),
+          t('payment.paymentCancelledDescription'),
+          [{ text: t('common.confirm'), style: 'default' }]
+        );
         if (onCancel) onCancel();
         break;
       
       case 'refunded':
-        toast({
-          title: '付款已退款',
-          description: '此筆付款已處理退款。',
-          status: 'info',
-          duration: 5000,
-          isClosable: true,
-        });
+        Alert.alert(
+          t('payment.paymentRefunded'),
+          t('payment.paymentRefundedDescription'),
+          [{ text: t('common.confirm'), style: 'default' }]
+        );
         break;
     }
   };
@@ -147,73 +129,82 @@ const PaymentStatusPage: React.FC<PaymentStatusPageProps> = ({
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
-        return CheckIcon;
+        return { name: 'check-circle', type: 'material-community' };
       case 'failed':
-        return WarningIcon;
+        return { name: 'alert-circle', type: 'material-community' };
       case 'cancelled':
-        return InfoIcon;
+        return { name: 'information', type: 'material-community' };
       case 'refunded':
-        return InfoIcon;
+        return { name: 'cash-refund', type: 'material-community' };
       case 'processing':
       case 'pending':
       default:
-        return InfoIcon;
+        return { name: 'clock-outline', type: 'material-community' };
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'green';
+        return colors.success;
       case 'failed':
-        return 'red';
+        return colors.danger;
       case 'cancelled':
-        return 'orange';
+        return colors.warning;
       case 'refunded':
-        return 'blue';
+        return colors.primary;
       case 'processing':
       case 'pending':
       default:
-        return 'blue';
+        return colors.primary;
     }
   };
 
   const getStatusTitle = (status: string) => {
     switch (status) {
       case 'completed':
-        return '付款成功';
+        return t('payment.statusCompleted');
       case 'failed':
-        return '付款失敗';
+        return t('payment.statusFailed');
       case 'cancelled':
-        return '付款已取消';
+        return t('payment.statusCancelled');
       case 'refunded':
-        return '付款已退款';
+        return t('payment.statusRefunded');
       case 'processing':
-        return '付款處理中';
+        return t('payment.statusProcessing');
       case 'pending':
-        return '等待付款';
+        return t('payment.statusPending');
       default:
-        return '付款狀態未知';
+        return t('payment.statusUnknown');
     }
   };
 
   const getStatusDescription = (status: string) => {
     switch (status) {
       case 'completed':
-        return '恭喜！您的付款已成功處理，活動報名完成。您將收到確認郵件。';
+        return t('payment.statusCompletedDesc');
       case 'failed':
-        return '很抱歉，付款處理失敗。請檢查您的付款資訊或選擇其他付款方式重新嘗試。';
+        return t('payment.statusFailedDesc');
       case 'cancelled':
-        return '付款流程已取消。如需報名活動，請重新開始付款流程。';
+        return t('payment.statusCancelledDesc');
       case 'refunded':
-        return '此筆付款已處理退款，金額將退回您的原付款方式。';
+        return t('payment.statusRefundedDesc');
       case 'processing':
-        return '系統正在處理您的付款，請稍候。這通常需要幾分鐘時間。';
+        return t('payment.statusProcessingDesc');
       case 'pending':
-        return '等待付款確認中，請完成付款流程。';
+        return t('payment.statusPendingDesc');
       default:
-        return '無法確定付款狀態，請聯繫客服。';
+        return t('payment.statusUnknownDesc');
     }
+  };
+
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('zh-TW', {
+      style: 'currency',
+      currency: 'TWD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
   };
 
   const handleRetryPayment = () => {
@@ -232,194 +223,314 @@ const PaymentStatusPage: React.FC<PaymentStatusPageProps> = ({
     }
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    contentContainer: {
+      padding: spacing.md,
+      paddingBottom: spacing.xl,
+      maxWidth: isTablet ? 600 : '100%',
+      alignSelf: 'center',
+      width: '100%',
+    },
+    centerCard: {
+      marginVertical: spacing.lg,
+    },
+    centerContent: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    statusIcon: {
+      marginBottom: spacing.lg,
+    },
+    statusTitle: {
+      ...typography.h1,
+      marginBottom: spacing.sm,
+      textAlign: 'center',
+    },
+    statusDescription: {
+      ...typography.body,
+      color: colors.midGrey,
+      textAlign: 'center',
+      lineHeight: 24,
+      marginBottom: spacing.md,
+    },
+    badge: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: 20,
+      marginVertical: spacing.md,
+    },
+    badgeText: {
+      ...typography.body,
+      color: colors.white,
+      fontWeight: '600',
+    },
+    progressContainer: {
+      width: '100%',
+      marginVertical: spacing.md,
+    },
+    progressText: {
+      ...typography.small,
+      color: colors.midGrey,
+      textAlign: 'center',
+      marginTop: spacing.sm,
+    },
+    detailsCard: {
+      backgroundColor: colors.lightGrey,
+      borderRadius: 8,
+      padding: spacing.md,
+      marginVertical: spacing.md,
+      width: '100%',
+    },
+    detailRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginVertical: spacing.xs,
+    },
+    detailLabel: {
+      ...typography.small,
+      color: colors.midGrey,
+    },
+    detailValue: {
+      ...typography.small,
+      fontWeight: '500',
+      color: colors.text,
+    },
+    actionContainer: {
+      width: '100%',
+      marginTop: spacing.lg,
+    },
+    actionButton: {
+      marginVertical: spacing.xs,
+    },
+    successButton: {
+      backgroundColor: colors.success,
+    },
+    primaryButton: {
+      backgroundColor: colors.primary,
+    },
+    loadingContainer: {
+      padding: spacing.xl * 2,
+    },
+    loadingText: {
+      ...typography.body,
+      color: colors.midGrey,
+      marginTop: spacing.md,
+    },
+    loadingSubtext: {
+      ...typography.small,
+      color: colors.midGrey,
+      marginTop: spacing.sm,
+    },
+    errorIcon: {
+      marginBottom: spacing.md,
+    },
+    errorTitle: {
+      ...typography.h2,
+      color: colors.danger,
+      marginBottom: spacing.sm,
+    },
+    errorText: {
+      ...typography.body,
+      color: colors.midGrey,
+      textAlign: 'center',
+      marginBottom: spacing.lg,
+    },
+  });
+
   if (isLoading) {
     return (
-      <Container maxW="md" py={8}>
-        <Card bg={bgColor} borderWidth={1} borderColor={borderColor}>
-          <CardBody>
-            <Center>
-              <VStack spacing={4}>
-                <Spinner size="xl" color="blue.500" />
-                <Text>檢查付款狀態中...</Text>
-                <Text fontSize="sm" color="gray.500">
-                  請稍候，正在確認您的付款結果
-                </Text>
-              </VStack>
-            </Center>
-          </CardBody>
-        </Card>
-      </Container>
+      <ScrollView style={styles.container}>
+        <View style={styles.contentContainer}>
+          <Card containerStyle={styles.centerCard}>
+            <View style={[styles.centerContent, styles.loadingContainer]}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.loadingText}>{t('payment.checkingStatus')}</Text>
+              <Text style={styles.loadingSubtext}>{t('payment.pleaseWait')}</Text>
+            </View>
+          </Card>
+        </View>
+      </ScrollView>
     );
   }
 
   if (error) {
     return (
-      <Container maxW="md" py={8}>
-        <Card bg={bgColor} borderWidth={1} borderColor={borderColor}>
-          <CardBody>
-            <VStack spacing={6} textAlign="center">
-              <Icon as={WarningIcon} boxSize={16} color="red.500" />
-              <Heading as="h2" size="lg" color="red.600">
-                發生錯誤
-              </Heading>
-              <Text color="gray.600">{error}</Text>
+      <ScrollView style={styles.container}>
+        <View style={styles.contentContainer}>
+          <Card containerStyle={styles.centerCard}>
+            <View style={styles.centerContent}>
+              <Icon
+                name="alert-circle"
+                type="material-community"
+                size={64}
+                color={colors.danger}
+                containerStyle={styles.errorIcon}
+              />
+              <Text style={styles.errorTitle}>{t('common.error')}</Text>
+              <Text style={styles.errorText}>{error}</Text>
               
-              <VStack spacing={3} w="full">
+              <View style={styles.actionContainer}>
                 <Button
-                  colorScheme="blue"
-                  onClick={() => window.location.reload()}
-                  w="full"
-                >
-                  重新載入
-                </Button>
+                  title={t('common.tryAgain')}
+                  onPress={() => {
+                    setError(null);
+                    setIsLoading(true);
+                    startStatusPolling();
+                  }}
+                  buttonStyle={[styles.actionButton, styles.primaryButton]}
+                />
                 <Button
-                  variant="outline"
-                  onClick={handleRetryPayment}
-                  w="full"
-                >
-                  重新嘗試付款
-                </Button>
-              </VStack>
-            </VStack>
-          </CardBody>
-        </Card>
-      </Container>
+                  title={t('payment.retryPayment')}
+                  type="outline"
+                  onPress={handleRetryPayment}
+                  buttonStyle={styles.actionButton}
+                  titleStyle={{ color: colors.primary }}
+                />
+              </View>
+            </View>
+          </Card>
+        </View>
+      </ScrollView>
     );
   }
 
   if (!paymentStatus) {
     return (
-      <Container maxW="md" py={8}>
-        <Card bg={bgColor} borderWidth={1} borderColor={borderColor}>
-          <CardBody>
-            <Center>
-              <Text>無法取得付款資訊</Text>
-            </Center>
-          </CardBody>
-        </Card>
-      </Container>
+      <ScrollView style={styles.container}>
+        <View style={styles.contentContainer}>
+          <Card containerStyle={styles.centerCard}>
+            <View style={styles.centerContent}>
+              <Text style={styles.statusDescription}>{t('payment.noPaymentInfo')}</Text>
+            </View>
+          </Card>
+        </View>
+      </ScrollView>
     );
   }
 
   const isProcessing = ['pending', 'processing'].includes(paymentStatus.status);
   const isSuccess = paymentStatus.status === 'completed';
   const isFailed = paymentStatus.status === 'failed';
+  const statusIcon = getStatusIcon(paymentStatus.status);
+  const statusColor = getStatusColor(paymentStatus.status);
 
   return (
-    <Container maxW="md" py={8}>
-      <Card bg={bgColor} borderWidth={1} borderColor={borderColor}>
-        <CardBody>
-          <VStack spacing={6} textAlign="center">
-            <Icon 
-              as={getStatusIcon(paymentStatus.status)} 
-              boxSize={16} 
-              color={`${getStatusColor(paymentStatus.status)}.500`} 
+    <ScrollView style={styles.container}>
+      <View style={styles.contentContainer}>
+        <Card containerStyle={styles.centerCard}>
+          <View style={styles.centerContent}>
+            <Icon
+              name={statusIcon.name}
+              type={statusIcon.type}
+              size={64}
+              color={statusColor}
+              containerStyle={styles.statusIcon}
             />
             
-            <Heading as="h2" size="lg" color={`${getStatusColor(paymentStatus.status)}.600`}>
+            <Text style={[styles.statusTitle, { color: statusColor }]}>
               {getStatusTitle(paymentStatus.status)}
-            </Heading>
+            </Text>
             
-            <Text color="gray.600" lineHeight="tall">
+            <Text style={styles.statusDescription}>
               {getStatusDescription(paymentStatus.status)}
             </Text>
 
-            <Badge 
-              colorScheme={getStatusColor(paymentStatus.status)} 
-              fontSize="md" 
-              px={4} 
-              py={2}
-              borderRadius="full"
-            >
-              {paymentService.getPaymentStatusText(paymentStatus.status)}
-            </Badge>
+            <View style={[styles.badge, { backgroundColor: statusColor }]}>
+              <Text style={styles.badgeText}>
+                {paymentService.getPaymentStatusText(paymentStatus.status)}
+              </Text>
+            </View>
 
             {isProcessing && (
-              <Box w="full">
-                <Progress 
-                  size="sm" 
-                  isIndeterminate 
-                  colorScheme="blue" 
-                  borderRadius="full"
+              <View style={styles.progressContainer}>
+                <LinearProgress
+                  color={colors.primary}
+                  variant="indeterminate"
+                  style={{ height: 4, borderRadius: 2 }}
                 />
-                <Text fontSize="sm" color="gray.500" mt={2}>
-                  已檢查 {pollingCount} 次，最多等待 3 分鐘
+                <Text style={styles.progressText}>
+                  {t('payment.pollingStatus', { count: pollingCount })}
                 </Text>
-              </Box>
+              </View>
             )}
 
             {/* Payment Details */}
-            <Box w="full" p={4} bg="gray.50" borderRadius="md">
-              <VStack spacing={2}>
-                <HStack justify="space-between" w="full">
-                  <Text fontSize="sm" color="gray.600">付款編號：</Text>
-                  <Text fontSize="sm" fontWeight="medium">
-                    {paymentStatus.payment.id.substring(0, 8)}...
-                  </Text>
-                </HStack>
-                
-                <HStack justify="space-between" w="full">
-                  <Text fontSize="sm" color="gray.600">付款金額：</Text>
-                  <Text fontSize="sm" fontWeight="medium">
-                    {paymentService.formatAmount(paymentStatus.payment.finalAmount)}
-                  </Text>
-                </HStack>
-                
-                <HStack justify="space-between" w="full">
-                  <Text fontSize="sm" color="gray.600">付款方式：</Text>
-                  <Text fontSize="sm" fontWeight="medium">
-                    {paymentService.getPaymentMethodName(paymentStatus.payment.paymentMethod)}
-                  </Text>
-                </HStack>
-                
-                <HStack justify="space-between" w="full">
-                  <Text fontSize="sm" color="gray.600">處理時間：</Text>
-                  <Text fontSize="sm" fontWeight="medium">
-                    {new Date(paymentStatus.payment.updatedAt).toLocaleString('zh-TW')}
-                  </Text>
-                </HStack>
-              </VStack>
-            </Box>
+            <View style={styles.detailsCard}>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t('payment.paymentId')}:</Text>
+                <Text style={styles.detailValue}>
+                  {paymentStatus.payment.id.substring(0, 8)}...
+                </Text>
+              </View>
+              
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t('payment.amount')}:</Text>
+                <Text style={styles.detailValue}>
+                  {formatCurrency(paymentStatus.payment.finalAmount)}
+                </Text>
+              </View>
+              
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t('payment.paymentMethod')}:</Text>
+                <Text style={styles.detailValue}>
+                  {paymentService.getPaymentMethodName(paymentStatus.payment.paymentMethod)}
+                </Text>
+              </View>
+              
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t('payment.processTime')}:</Text>
+                <Text style={styles.detailValue}>
+                  {new Date(paymentStatus.payment.updatedAt).toLocaleString('zh-TW')}
+                </Text>
+              </View>
+            </View>
 
             {/* Action Buttons */}
-            <VStack spacing={3} w="full">
+            <View style={styles.actionContainer}>
               {isSuccess && (
                 <Button
-                  colorScheme="green"
-                  size="lg"
-                  rightIcon={<ArrowForwardIcon />}
-                  onClick={handleGoToEvent}
-                  w="full"
-                >
-                  查看活動詳情
-                </Button>
+                  title={t('payment.viewEventDetails')}
+                  icon={
+                    <Icon
+                      name="arrow-right"
+                      type="material-community"
+                      size={20}
+                      color={colors.white}
+                      style={{ marginLeft: spacing.xs }}
+                    />
+                  }
+                  iconPosition="right"
+                  onPress={handleGoToEvent}
+                  buttonStyle={[styles.actionButton, styles.successButton]}
+                />
               )}
               
               {isFailed && (
                 <Button
-                  colorScheme="blue"
-                  size="lg"
-                  onClick={handleRetryPayment}
-                  w="full"
-                >
-                  重新嘗試付款
-                </Button>
+                  title={t('payment.retryPayment')}
+                  onPress={handleRetryPayment}
+                  buttonStyle={[styles.actionButton, styles.primaryButton]}
+                />
               )}
               
               {!isSuccess && (
                 <Button
-                  variant="outline"
-                  onClick={handleGoToEvent}
-                  w="full"
-                >
-                  回到活動頁面
-                </Button>
+                  title={t('payment.backToEvent')}
+                  type="outline"
+                  onPress={handleGoToEvent}
+                  buttonStyle={styles.actionButton}
+                  titleStyle={{ color: colors.primary }}
+                />
               )}
-            </VStack>
-          </VStack>
-        </CardBody>
-      </Card>
-    </Container>
+            </View>
+          </View>
+        </Card>
+      </View>
+    </ScrollView>
   );
 };
 

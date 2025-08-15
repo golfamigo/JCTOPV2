@@ -1,54 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Container,
-  VStack,
-  HStack,
-  Heading,
+  View,
+  ScrollView,
+  StyleSheet,
+  ActivityIndicator,
+  Alert as RNAlert,
+  RefreshControl,
+} from 'react-native';
+import {
   Text,
   Button,
-  Alert,
-  AlertIcon,
-  Spinner,
-  Center,
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  useColorModeValue,
-  useToast,
   Badge,
   Card,
-  CardHeader,
-  CardBody,
-  Stat,
-  StatLabel,
-  StatNumber,
-  StatHelpText,
   Divider,
-  IconButton,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  ModalCloseButton,
-  useDisclosure,
-  Tabs,
-  TabList,
-  TabPanels,
   Tab,
-  TabPanel,
-} from '@chakra-ui/react';
-import { 
-  ChevronRightIcon, 
-  ChevronLeftIcon,
-  ViewIcon,
-  CloseIcon,
-  CheckIcon,
-  SearchIcon,
-} from '@chakra-ui/icons';
-import { useParams, useNavigate } from 'react-router-dom';
+  TabView,
+  Icon,
+  Header,
+  ListItem,
+} from '@rneui/themed';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { CameraScanner } from './CameraScanner';
 import { CameraService } from '../../../services/cameraService';
 import { CheckInService } from '../../../services/checkinService';
@@ -62,7 +34,7 @@ import attendeeSearchService from '../../../services/attendeeSearchService';
 import { Event } from '@jctop-event/shared-types';
 import statisticsService, { EventStatistics } from '../../../services/statisticsService';
 import { CheckInStatisticsHeader } from './CheckInStatisticsHeader';
-
+import { useAppTheme } from '@/theme';
 
 interface ScannedTicket {
   registrationId: string;
@@ -74,10 +46,10 @@ interface ScannedTicket {
 }
 
 export const CheckInModeScreen: React.FC = () => {
-  const { eventId } = useParams<{ eventId: string }>();
-  const navigate = useNavigate();
-  const toast = useToast();
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const route = useRoute();
+  const navigation = useNavigation();
+  const eventId = (route.params as any)?.eventId;
+  const { colors, spacing } = useAppTheme();
 
   const [event, setEvent] = useState<Event | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -102,10 +74,7 @@ export const CheckInModeScreen: React.FC = () => {
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [checkingInId, setCheckingInId] = useState<string | undefined>();
   const [activeTab, setActiveTab] = useState(0);
-
-  const bgColor = useColorModeValue('neutral.50', 'neutral.900');
-  const cardBgColor = useColorModeValue('white', 'neutral.800');
-  const borderColor = useColorModeValue('neutral.200', 'neutral.600');
+  const [refreshing, setRefreshing] = useState(false);
 
   const cameraService = CameraService.getInstance();
   const checkInService = CheckInService.getInstance();
@@ -121,8 +90,7 @@ export const CheckInModeScreen: React.FC = () => {
     if (!eventId || !statistics) return;
 
     const interval = setInterval(() => {
-      // Only refresh if not already refreshing and user is actively using the app
-      if (!isRefreshingStats && !document.hidden) {
+      if (!isRefreshingStats) {
         statisticsService.getEventStatistics(eventId, true).then(result => {
           if (result.success && result.data) {
             setStatistics(result.data);
@@ -145,15 +113,10 @@ export const CheckInModeScreen: React.FC = () => {
     } catch (error) {
       const errorMessage = `Failed to load event data: ${error instanceof Error ? error.message : 'Unknown error'}`;
       setError(errorMessage);
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      RNAlert.alert('Error', errorMessage);
     } finally {
       setIsLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -186,209 +149,96 @@ export const CheckInModeScreen: React.FC = () => {
       
       if (result.success && result.data) {
         setStatistics(result.data);
-        toast({
-          title: 'Statistics Updated',
-          description: 'Statistics have been refreshed',
-          status: 'success',
-          duration: 2000,
-          isClosable: true,
-        });
+        RNAlert.alert('Success', 'Statistics have been refreshed');
       } else {
         setStatisticsError(result.error || 'Failed to refresh statistics');
-        toast({
-          title: 'Refresh Failed',
-          description: result.error || 'Failed to refresh statistics',
-          status: 'error',
-          duration: 3000,
-          isClosable: true,
-        });
+        RNAlert.alert('Error', result.error || 'Failed to refresh statistics');
       }
     } catch (error) {
-      console.error('Failed to refresh statistics:', error);
+      console.error('Failed to refresh stats:', error);
       setStatisticsError('Failed to refresh statistics');
+      RNAlert.alert('Error', 'Failed to refresh statistics');
     } finally {
       setIsRefreshingStats(false);
     }
   };
 
-  const handleStartScanning = () => {
+  const handleQRCodeScanned = async (qrCode: string) => {
+    if (isScanning) return;
+    
     setIsScanning(true);
-    setError('');
-  };
-
-  const handleStopScanning = () => {
-    setIsScanning(false);
-  };
-
-  const handleQRCodeScanned = async (qrData: string) => {
+    
     try {
-      // Validate QR code format
-      const validationResult = cameraService.validateQRCodeData(qrData);
+      const result = await checkInService.checkInByQRCode(eventId!, qrCode);
       
-      if (!validationResult.success) {
-        setErrorMessage(validationResult.error || 'Invalid QR code');
-        setErrorCode('INVALID_QR_CODE');
-        setShowErrorModal(true);
-        return;
-      }
-
-      // Process the scanned registration
-      const processResult = await cameraService.processScannedQR(qrData);
-      
-      if (!processResult.success) {
-        setErrorMessage(processResult.error || 'Failed to process QR code');
-        setErrorCode('INVALID_QR_CODE');
-        setShowErrorModal(true);
-        return;
-      }
-
-      // Call backend to validate and check-in the attendee
-      const checkInResult = await checkInService.processQRCodeCheckIn(eventId!, processResult.data);
-      
-      if (checkInResult.success && checkInResult.data) {
-        const { attendee } = checkInResult.data;
-        if (attendee) {
-          setSuccessAttendee(attendee);
-          setShowSuccessModal(true);
-          
-          // Add to recent scans
-          const ticket: ScannedTicket = {
-            registrationId: processResult.data.registrationId || 'unknown',
-            attendeeName: attendee.name,
-            ticketType: attendee.ticketType,
-            status: 'valid',
-          };
-          setRecentScans(prev => [ticket, ...prev.slice(0, 4)]); // Keep last 5 scans
-          
-          // Refresh statistics
-          refreshStatistics();
-        }
-      } else {
-        setErrorMessage(checkInResult.error || 'Check-in failed');
-        setErrorCode(checkInResult.errorCode as any);
-        setShowErrorModal(true);
-        
-        // Add to recent scans as failed
-        const ticket: ScannedTicket = {
-          registrationId: processResult.data.registrationId || 'unknown',
-          attendeeName: 'Unknown',
-          ticketType: 'Unknown',
-          status: checkInResult.errorCode === 'ALREADY_CHECKED_IN' ? 'already_checked_in' : 'invalid',
-          errorMessage: checkInResult.error,
-          errorCode: checkInResult.errorCode as any,
-        };
-        setRecentScans(prev => [ticket, ...prev.slice(0, 4)]);
-      }
-
-    } catch (error) {
-      const errorMsg = `Failed to process QR code: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      setErrorMessage(errorMsg);
-      setErrorCode('INVALID_QR_CODE');
-      setShowErrorModal(true);
-    }
-  };
-
-  const handleScanError = (error: string) => {
-    setError(error);
-    toast({
-      title: 'Camera Error',
-      description: error,
-      status: 'error',
-      duration: 5000,
-      isClosable: true,
-    });
-  };
-
-  const handleExitCheckInMode = () => {
-    navigate(`/organizer/events/${eventId}/attendees`);
-  };
-
-  const handleSearch = async (query: string) => {
-    try {
-      setIsSearching(true);
-      setSearchError('');
-      
-      // Validate search query
-      const validation = attendeeSearchService.validateSearchQuery(query);
-      if (!validation.valid) {
-        setSearchError(validation.error || 'Invalid search query');
-        return;
-      }
-      
-      // Search for attendees
-      const results = await attendeeSearchService.searchAttendees(eventId!, { query });
-      setSearchResults(results.attendees);
-    } catch (error) {
-      const errorMsg = `Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      setSearchError(errorMsg);
-      toast({
-        title: 'Search Error',
-        description: errorMsg,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handleClearSearch = () => {
-    setSearchResults([]);
-    setSearchError('');
-  };
-
-  const handleManualCheckIn = async (attendee: AttendeeSearchResult) => {
-    try {
-      setIsCheckingIn(true);
-      setCheckingInId(attendee.id);
-      
-      // Call the manual check-in service
-      const result = await attendeeSearchService.manualCheckIn(eventId!, attendee.registrationId);
-      
-      if (result.success && result.attendee) {
-        setSuccessAttendee(result.attendee);
-        setShowSuccessModal(true);
-        
-        // Refresh statistics
-        refreshStatistics();
-        
-        // Update search results to reflect checked-in status
-        setSearchResults(prev => prev.map(result => 
-          result.id === attendee.id 
-            ? { ...result, status: 'checkedIn' as const, checkedInAt: new Date().toISOString() }
-            : result
-        ));
-        
-        // Add to recent scans
-        const ticket: ScannedTicket = {
-          registrationId: attendee.registrationId,
-          attendeeName: attendee.name,
-          ticketType: attendee.ticketType || 'General Admission',
+      if (result.success && result.data) {
+        const scanResult: ScannedTicket = {
+          registrationId: qrCode,
+          attendeeName: result.data.attendee?.name || 'Unknown',
+          ticketType: result.data.attendee?.ticketType || 'General',
           status: 'valid',
         };
-        setRecentScans(prev => [ticket, ...prev.slice(0, 4)]);
+        
+        setCurrentScan(scanResult);
+        setRecentScans([scanResult, ...recentScans.slice(0, 9)]);
+        setSuccessAttendee(result.data.attendee || null);
+        setShowSuccessModal(true);
+        
+        // Refresh statistics after successful check-in
+        loadCheckInStats();
       } else {
-        setErrorMessage(result.error || 'Manual check-in failed');
+        const scanResult: ScannedTicket = {
+          registrationId: qrCode,
+          attendeeName: 'Unknown',
+          ticketType: '',
+          status: 'invalid',
+          errorMessage: result.error,
+          errorCode: result.errorCode as 'ALREADY_CHECKED_IN' | 'TICKET_NOT_FOUND' | 'INVALID_QR_CODE' | undefined,
+        };
+        
+        setCurrentScan(scanResult);
+        setRecentScans([scanResult, ...recentScans.slice(0, 9)]);
+        setErrorMessage(result.error || 'Invalid QR code');
+        setErrorCode(result.errorCode as 'ALREADY_CHECKED_IN' | 'TICKET_NOT_FOUND' | 'INVALID_QR_CODE' | undefined);
+        setShowErrorModal(true);
+      }
+    } catch (error) {
+      console.error('Check-in error:', error);
+      setErrorMessage('An unexpected error occurred');
+      setShowErrorModal(true);
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleManualCheckIn = async (attendeeId: string) => {
+    try {
+      setIsCheckingIn(true);
+      setCheckingInId(attendeeId);
+      
+      const result = await attendeeSearchService.manualCheckIn(eventId!, attendeeId);
+      
+      if (result.success && result.attendee) {
+        setSuccessAttendee(result.attendee || null);
+        setShowSuccessModal(true);
+        
+        // Refresh search results and statistics
+        if (searchResults.length > 0) {
+          const updatedResults = searchResults.map(r => 
+            r.id === attendeeId ? { ...r, checkedIn: true } : r
+          );
+          setSearchResults(updatedResults);
+        }
+        
+        loadCheckInStats();
+      } else {
+        setErrorMessage(result.error || 'Failed to check in attendee');
         setErrorCode(result.errorCode);
         setShowErrorModal(true);
-        
-        // Add to recent scans as failed
-        const ticket: ScannedTicket = {
-          registrationId: attendee.registrationId,
-          attendeeName: attendee.name,
-          ticketType: attendee.ticketType || 'General Admission',
-          status: result.errorCode === 'ALREADY_CHECKED_IN' ? 'already_checked_in' : 'invalid',
-          errorMessage: result.error,
-          errorCode: result.errorCode,
-        };
-        setRecentScans(prev => [ticket, ...prev.slice(0, 4)]);
       }
-      
     } catch (error) {
-      const errorMsg = `Manual check-in failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      setErrorMessage(errorMsg);
-      setErrorCode('TICKET_NOT_FOUND');
+      console.error('Manual check-in error:', error);
+      setErrorMessage('An unexpected error occurred');
       setShowErrorModal(true);
     } finally {
       setIsCheckingIn(false);
@@ -396,104 +246,133 @@ export const CheckInModeScreen: React.FC = () => {
     }
   };
 
+  const handleCameraError = (error: string) => {
+    RNAlert.alert('Camera Error', error);
+  };
+
+  const handleExitCheckInMode = () => {
+    (navigation as any).navigate('OrganizerAttendees', { eventId });
+  };
+
+  const handleSearch = async (query: string) => {
+    try {
+      setIsSearching(true);
+      setSearchError('');
+      
+      const result = await attendeeSearchService.searchAttendees(eventId!, {
+        query,
+        limit: 20,
+      });
+      
+      setSearchResults(result.attendees);
+      if (result.attendees.length === 0) {
+        setSearchError('No attendees found matching your search');
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchError(error instanceof Error ? error.message : 'An error occurred during search');
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadEventData();
+  };
+
   const getStatusColor = (status: ScannedTicket['status']) => {
     switch (status) {
       case 'valid':
-        return 'success';
+        return colors.success;
       case 'already_checked_in':
-        return 'warning';
+        return colors.warning;
       case 'invalid':
       default:
-        return 'error';
+        return colors.error;
     }
   };
 
   const getStatusIcon = (status: ScannedTicket['status']) => {
     switch (status) {
       case 'valid':
-        return CheckIcon;
+        return 'check-circle';
       case 'already_checked_in':
-        return ViewIcon;
+        return 'visibility';
       case 'invalid':
       default:
-        return CloseIcon;
+        return 'cancel';
     }
   };
 
   if (isLoading) {
     return (
-      <Box minH="100vh" bg={bgColor}>
-        <Container maxW="container.xl" py={8}>
-          <Center minH="60vh">
-            <VStack spacing={6}>
-              <Spinner size="xl" color="primary.500" thickness="4px" />
-              <Text fontSize="lg" color="neutral.600">
-                Loading check-in mode...
-              </Text>
-            </VStack>
-          </Center>
-        </Container>
-      </Box>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Header
+          centerComponent={{ text: 'Check-in Mode', style: { color: colors.white } }}
+          backgroundColor={colors.primary}
+        />
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading check-in mode...</Text>
+        </View>
+      </View>
     );
   }
 
   if (!event) {
     return (
-      <Box minH="100vh" bg={bgColor}>
-        <Container maxW="container.xl" py={8}>
-          <Alert status="error">
-            <AlertIcon />
-            <Text>Event not found or access denied.</Text>
-          </Alert>
-        </Container>
-      </Box>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Header
+          centerComponent={{ text: 'Check-in Mode', style: { color: colors.white } }}
+          backgroundColor={colors.primary}
+        />
+        <View style={styles.centerContent}>
+          <Icon name="error-outline" type="material" color={colors.error} size={48} />
+          <Text style={[styles.errorText, { color: colors.error }]}>
+            Event not found or access denied.
+          </Text>
+        </View>
+      </View>
     );
   }
 
   return (
-    <Box minH="100vh" bg={bgColor}>
-      <Container maxW="container.xl" py={6}>
-        <VStack spacing={6} align="stretch">
-          {/* Header with breadcrumb */}
-          <Box>
-            <Breadcrumb spacing="8px" separator={<ChevronRightIcon color="neutral.500" />}>
-              <BreadcrumbItem>
-                <BreadcrumbLink onClick={() => navigate('/organizer/dashboard')}>
-                  Dashboard
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbItem>
-                <BreadcrumbLink onClick={() => navigate(`/organizer/events/${eventId}/attendees`)}>
-                  {event.title}
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbItem isCurrentPage>
-                <Text color="neutral.600">Check-in Mode</Text>
-              </BreadcrumbItem>
-            </Breadcrumb>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Header
+        leftComponent={
+          <Icon
+            name="arrow-back"
+            type="material"
+            color={colors.white}
+            onPress={() => navigation.goBack()}
+          />
+        }
+        centerComponent={{ text: `Check-in: ${event.title}`, style: { color: colors.white } }}
+        rightComponent={
+          <Icon
+            name="exit-to-app"
+            type="material"
+            color={colors.white}
+            onPress={handleExitCheckInMode}
+          />
+        }
+        backgroundColor={colors.primary}
+      />
 
-            <HStack justify="space-between" align="center" mt={4}>
-              <VStack align="start" spacing={1}>
-                <Heading size="lg" color="neutral.900">
-                  Check-in Mode: {event.title}
-                </Heading>
-                <Text color="neutral.600" fontSize="md">
-                  Scan attendee QR codes to check them in
-                </Text>
-              </VStack>
-              
-              <Button
-                leftIcon={<ChevronLeftIcon />}
-                variant="outline"
-                colorScheme="neutral"
-                onClick={handleExitCheckInMode}
-              >
-                Exit Check-in Mode
-              </Button>
-            </HStack>
-          </Box>
-
-          {/* Statistics Header */}
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primary]}
+          />
+        }
+      >
+        {/* Statistics Header */}
+        {statistics && (
           <CheckInStatisticsHeader
             statistics={statistics}
             isLoading={statisticsLoading}
@@ -501,196 +380,169 @@ export const CheckInModeScreen: React.FC = () => {
             onRefresh={refreshStatistics}
             isRefreshing={isRefreshingStats}
           />
+        )}
 
-          {/* Main Scanner Interface with Tabs */}
-          <HStack spacing={8} align="start">
-            {/* Left side - Scanner/Search */}
-            <VStack flex={2} spacing={4}>
-              <Card bg={cardBgColor} borderColor={borderColor} border="1px solid" w="100%">
-                <CardBody>
-                  <Tabs 
-                    index={activeTab} 
-                    onChange={setActiveTab} 
-                    colorScheme="primary"
-                    variant="enclosed"
-                  >
-                    <TabList>
-                      <Tab>
-                        <HStack spacing={2}>
-                          <ViewIcon />
-                          <Text>QR Scanner</Text>
-                        </HStack>
-                      </Tab>
-                      <Tab>
-                        <HStack spacing={2}>
-                          <SearchIcon />
-                          <Text>Manual Search</Text>
-                        </HStack>
-                      </Tab>
-                    </TabList>
+        {/* Tab Navigation */}
+        <Tab
+          value={activeTab}
+          onChange={setActiveTab}
+          indicatorStyle={{ backgroundColor: colors.primary }}
+        >
+          <Tab.Item
+            title="QR Scanner"
+            titleStyle={{ fontSize: 14, color: activeTab === 0 ? colors.primary : colors.grey3 }}
+            icon={{ name: 'qr-code-scanner', type: 'material', color: activeTab === 0 ? colors.primary : colors.grey3 }}
+          />
+          <Tab.Item
+            title="Manual Search"
+            titleStyle={{ fontSize: 14, color: activeTab === 1 ? colors.primary : colors.grey3 }}
+            icon={{ name: 'search', type: 'material', color: activeTab === 1 ? colors.primary : colors.grey3 }}
+          />
+        </Tab>
 
-                    <TabPanels>
-                      {/* QR Scanner Tab */}
-                      <TabPanel>
-                        <VStack spacing={4}>
-                          <HStack justify="space-between" align="center" w="100%">
-                            <Heading size="md">QR Code Scanner</Heading>
-                            <Badge
-                              colorScheme={isScanning ? 'green' : 'gray'}
-                              variant="subtle"
-                              px={3}
-                              py={1}
-                            >
-                              {isScanning ? 'Active' : 'Inactive'}
-                            </Badge>
-                          </HStack>
-                          
-                          <CameraScanner
-                            onQRCodeScanned={handleQRCodeScanned}
-                            onError={handleScanError}
-                            isScanning={isScanning}
-                            height={400}
-                          />
-                          
-                          <Text textAlign="center" color="neutral.600" fontSize="sm">
-                            Position the QR code within the scanning frame
-                          </Text>
-                          
-                          <HStack spacing={4}>
-                            {!isScanning ? (
-                              <Button
-                                colorScheme="primary"
-                                size="lg"
-                                onClick={handleStartScanning}
-                                leftIcon={<ViewIcon />}
-                              >
-                                Start Scanning
-                              </Button>
-                            ) : (
-                              <Button
-                                colorScheme="red"
-                                size="lg"
-                                onClick={handleStopScanning}
-                                leftIcon={<CloseIcon />}
-                              >
-                                Stop Scanning
-                              </Button>
-                            )}
-                          </HStack>
-                        </VStack>
-                      </TabPanel>
-
-                      {/* Manual Search Tab */}
-                      <TabPanel>
-                        <VStack spacing={6} align="stretch">
-                          <Heading size="md">Manual Attendee Search</Heading>
-                          
-                          <AttendeeSearchForm
-                            onSearch={handleSearch}
-                            isSearching={isSearching}
-                            onClear={handleClearSearch}
-                          />
-                          
-                          <Divider />
-                          
-                          <AttendeeSearchResults
-                            results={searchResults}
-                            isLoading={isSearching}
-                            error={searchError}
-                            onCheckIn={handleManualCheckIn}
-                            isCheckingIn={isCheckingIn}
-                            checkingInId={checkingInId}
-                          />
-                        </VStack>
-                      </TabPanel>
-                    </TabPanels>
-                  </Tabs>
-                </CardBody>
-              </Card>
-            </VStack>
+        <TabView value={activeTab} onChange={setActiveTab} animationType="spring">
+          {/* QR Scanner Tab */}
+          <TabView.Item style={styles.tabContent}>
+            <Card containerStyle={styles.card}>
+              <CameraScanner
+                onQRCodeScanned={handleQRCodeScanned}
+                onError={handleCameraError}
+                isScanning={isScanning}
+              />
+            </Card>
 
             {/* Recent Scans */}
-            <VStack flex={1} spacing={4}>
-              <Card bg={cardBgColor} borderColor={borderColor} border="1px solid" w="100%">
-                <CardHeader>
-                  <Heading size="md">Recent Check-ins</Heading>
-                </CardHeader>
-                <CardBody>
-                  <VStack spacing={3} align="stretch">
-                    {recentScans.length === 0 ? (
-                      <Text color="neutral.500" textAlign="center" py={8}>
-                        No check-ins yet
-                      </Text>
-                    ) : (
-                      recentScans.map((scan, index) => (
-                        <Box
-                          key={index}
-                          p={3}
-                          border="1px solid"
-                          borderColor={borderColor}
-                          borderRadius="md"
-                          bg={useColorModeValue('neutral.25', 'neutral.700')}
-                        >
-                          <HStack justify="space-between" align="center">
-                            <VStack align="start" spacing={1}>
-                              <Text fontWeight="semibold" fontSize="sm">
-                                {scan.attendeeName}
-                              </Text>
-                              <Text fontSize="xs" color="neutral.600">
-                                {scan.ticketType}
-                              </Text>
-                            </VStack>
-                            <Badge
-                              colorScheme={getStatusColor(scan.status)}
-                              variant="subtle"
-                              size="sm"
-                            >
-                              {scan.status === 'valid' ? 'Checked In' : 
-                               scan.status === 'already_checked_in' ? 'Already In' : 'Invalid'}
-                            </Badge>
-                          </HStack>
-                        </Box>
-                      ))
-                    )}
-                  </VStack>
-                </CardBody>
+            {recentScans.length > 0 && (
+              <Card containerStyle={styles.card}>
+                <Text h4 style={styles.cardTitle}>Recent Scans</Text>
+                <Divider style={styles.divider} />
+                {recentScans.map((scan, index) => (
+                  <ListItem key={index} bottomDivider>
+                    <Icon
+                      name={getStatusIcon(scan.status)}
+                      type="material"
+                      color={getStatusColor(scan.status)}
+                    />
+                    <ListItem.Content>
+                      <ListItem.Title>{scan.attendeeName}</ListItem.Title>
+                      <ListItem.Subtitle>{scan.ticketType || scan.errorMessage}</ListItem.Subtitle>
+                    </ListItem.Content>
+                    <Badge
+                      value={scan.status.replace('_', ' ').toUpperCase()}
+                      badgeStyle={{ backgroundColor: getStatusColor(scan.status) }}
+                    />
+                  </ListItem>
+                ))}
               </Card>
-            </VStack>
-          </HStack>
+            )}
+          </TabView.Item>
 
-          {/* Error Display */}
-          {error && (
-            <Alert status="error">
-              <AlertIcon />
-              <Text>{error}</Text>
-            </Alert>
-          )}
-        </VStack>
-      </Container>
+          {/* Manual Search Tab */}
+          <TabView.Item style={styles.tabContent}>
+            <Card containerStyle={styles.card}>
+              <AttendeeSearchForm
+                onSearch={handleSearch}
+                isSearching={isSearching}
+                onClear={() => {
+                  setSearchResults([]);
+                  setSearchError('');
+                }}
+              />
+            </Card>
+
+            {searchError && (
+              <Card containerStyle={[styles.card, styles.errorCard]}>
+                <Text style={styles.errorText}>{searchError}</Text>
+              </Card>
+            )}
+
+            {searchResults.length > 0 && (
+              <Card containerStyle={styles.card}>
+                <Text h4 style={styles.cardTitle}>Search Results</Text>
+                <Divider style={styles.divider} />
+                <AttendeeSearchResults
+                  results={searchResults}
+                  onCheckIn={(attendee) => handleManualCheckIn(attendee.id)}
+                  isCheckingIn={isCheckingIn}
+                  checkingInId={checkingInId}
+                  isLoading={isSearching}
+                  error={searchError}
+                />
+              </Card>
+            )}
+          </TabView.Item>
+        </TabView>
+      </ScrollView>
 
       {/* Success Modal */}
       {successAttendee && (
         <CheckInSuccessModal
           isOpen={showSuccessModal}
+          attendee={successAttendee}
           onClose={() => {
             setShowSuccessModal(false);
             setSuccessAttendee(null);
           }}
-          attendee={successAttendee}
         />
       )}
 
       {/* Error Modal */}
       <CheckInErrorModal
         isOpen={showErrorModal}
+        error={errorMessage}
+        errorCode={errorCode}
         onClose={() => {
           setShowErrorModal(false);
           setErrorMessage('');
           setErrorCode(undefined);
         }}
-        error={errorMessage}
-        errorCode={errorCode}
       />
-    </Box>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  tabContent: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  card: {
+    marginHorizontal: 15,
+    marginVertical: 10,
+    borderRadius: 8,
+  },
+  cardTitle: {
+    marginBottom: 10,
+  },
+  divider: {
+    marginVertical: 10,
+  },
+  errorCard: {
+    backgroundColor: '#FEE',
+    borderColor: '#FCC',
+  },
+});
+
+export default CheckInModeScreen;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, View } from 'react-native';
-import { ChakraProvider, useToast } from '@chakra-ui/react';
+import { ScrollView, View, Alert } from 'react-native';
+import { ThemeProvider } from '@rneui/themed';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Event, TicketSelection, RegistrationFormData, PaymentResponse } from '@jctop-event/shared-types';
@@ -9,7 +9,8 @@ import RegistrationStepTwo from '../../../components/features/event/Registration
 import PaymentStep from '../../../components/features/event/PaymentStep';
 import PaymentStatusPage from '../../../components/features/event/PaymentStatusPage';
 import eventService from '../../../services/eventService';
-import theme from '../../../theme';
+import { theme } from '@/theme';
+import { useResponsive } from '../../../hooks/useResponsive';
 
 /**
  * Event Registration Page Component
@@ -31,7 +32,7 @@ import theme from '../../../theme';
 export default function EventRegistrationPage() {
   const router = useRouter();
   const { id: eventId } = useLocalSearchParams<{ id: string }>();
-  const toast = useToast();
+  const responsive = useResponsive();
 
   // State management
   const [event, setEvent] = useState<Event | null>(null);
@@ -61,13 +62,7 @@ export default function EventRegistrationPage() {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to load event details';
       setError(errorMessage);
-      toast({
-        title: 'Loading Error',
-        description: errorMessage,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      Alert.alert('Loading Error', errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -98,13 +93,7 @@ export default function EventRegistrationPage() {
     setPaymentResponse(response);
     setCurrentStep(4); // Move to payment status/confirmation step
     
-    toast({
-      title: '付款處理中',
-      description: '正在處理您的付款，請稍候...',
-      status: 'info',
-      duration: 5000,
-      isClosable: true,
-    });
+    Alert.alert('付款處理中', '正在處理您的付款，請稍候...');
   };
 
   const handlePaymentBack = () => {
@@ -112,13 +101,7 @@ export default function EventRegistrationPage() {
   };
 
   const handlePaymentStatusSuccess = () => {
-    toast({
-      title: '報名成功！',
-      description: '恭喜您成功報名活動，即將為您導向活動頁面',
-      status: 'success',
-      duration: 5000,
-      isClosable: true,
-    });
+    Alert.alert('報名成功！', '恭喜您成功報名活動，即將為您導向活動頁面');
     
     // Navigate back to event page after short delay
     setTimeout(() => {
@@ -138,33 +121,39 @@ export default function EventRegistrationPage() {
 
   if (isLoading) {
     return (
-      <ChakraProvider theme={theme}>
+      <ThemeProvider theme={theme}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <StatusBar style="dark" />
           {/* Loading spinner would be here */}
         </View>
-      </ChakraProvider>
+      </ThemeProvider>
     );
   }
 
   if (error || !event) {
     return (
-      <ChakraProvider theme={theme}>
+      <ThemeProvider theme={theme}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <StatusBar style="dark" />
           {/* Error message would be here */}
         </View>
-      </ChakraProvider>
+      </ThemeProvider>
     );
   }
 
   return (
-    <ChakraProvider theme={theme}>
+    <ThemeProvider theme={theme}>
       <View style={{ flex: 1 }}>
         <StatusBar style="dark" />
         <ScrollView 
           style={{ flex: 1 }}
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={{ 
+            flexGrow: 1,
+            paddingHorizontal: responsive.isTablet ? 40 : 0,
+            maxWidth: responsive.isTablet ? 800 : '100%',
+            alignSelf: 'center',
+            width: '100%',
+          }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -210,6 +199,6 @@ export default function EventRegistrationPage() {
           )}
         </ScrollView>
       </View>
-    </ChakraProvider>
+    </ThemeProvider>
   );
 }

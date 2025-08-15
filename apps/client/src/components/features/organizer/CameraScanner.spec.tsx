@@ -1,9 +1,8 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ChakraProvider } from '@chakra-ui/react';
 import { CameraScanner } from './CameraScanner';
 import { CameraService } from '../../../services/cameraService';
-import theme from '../../../theme';
+import theme from '@/theme';
 
 // Mock expo-camera
 const mockCamera = {

@@ -1,22 +1,9 @@
-import React from 'react';
-import {
-  Button,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  ModalCloseButton,
-  Text,
-  VStack,
-  HStack,
-  useDisclosure,
-  Alert,
-  AlertIcon,
-} from '@chakra-ui/react';
-import { CheckIcon, WarningIcon } from '@chakra-ui/icons';
+import React, { useState } from 'react';
+import { View, StyleSheet, Alert } from 'react-native';
+import { Button, Text, Overlay, Icon } from '@rneui/themed';
+import { MaterialIcons } from '@expo/vector-icons';
 import { AttendeeSearchResult } from './AttendeeSearchResults';
+import { useAppTheme } from '../../../theme';
 
 interface ManualCheckInButtonProps {
   attendee: AttendeeSearchResult;
@@ -29,76 +16,205 @@ export const ManualCheckInButton: React.FC<ManualCheckInButtonProps> = ({
   onConfirm,
   isLoading,
 }) => {
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [isOpen, setIsOpen] = useState(false);
+  const { colors } = useAppTheme();
 
   const handleConfirm = () => {
     onConfirm();
-    onClose();
+    setIsOpen(false);
   };
 
   return (
     <>
       <Button
-        colorScheme="primary"
+        title="Check In"
         size="sm"
-        leftIcon={<CheckIcon />}
-        onClick={onOpen}
-        isDisabled={attendee.status !== 'paid'}
+        onPress={() => setIsOpen(true)}
+        disabled={attendee.status !== 'paid'}
+        buttonStyle={[styles.checkInButton, { backgroundColor: colors.primary }]}
+        icon={
+          <Icon
+            name="check"
+            type="material"
+            color={colors.white}
+            size={16}
+            containerStyle={{ marginRight: 4 }}
+          />
+        }
+      />
+
+      <Overlay
+        isVisible={isOpen}
+        onBackdropPress={() => setIsOpen(false)}
+        overlayStyle={[styles.overlay, { backgroundColor: colors.card }]}
       >
-        Check In
-      </Button>
-
-      <Modal isOpen={isOpen} onClose={onClose} isCentered>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Confirm Manual Check-In</ModalHeader>
-          <ModalCloseButton />
+        <View>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text h4 style={[styles.headerTitle, { color: colors.text }]}>
+              Confirm Manual Check-In
+            </Text>
+            <Icon
+              name="close"
+              type="material"
+              color={colors.grey2}
+              size={24}
+              onPress={() => setIsOpen(false)}
+            />
+          </View>
           
-          <ModalBody>
-            <VStack spacing={4} align="stretch">
-              <Alert status="warning" borderRadius="md">
-                <AlertIcon as={WarningIcon} />
-                <Text fontSize="sm">
-                  Please verify the attendee's identity before checking them in manually.
-                </Text>
-              </Alert>
-              
-              <VStack align="start" spacing={2}>
-                <Text fontWeight="semibold">Attendee Details:</Text>
-                <VStack align="start" spacing={1} pl={4}>
-                  <Text fontSize="sm">Name: {attendee.name}</Text>
-                  <Text fontSize="sm">Email: {attendee.email}</Text>
-                  <Text fontSize="sm">Registration ID: {attendee.registrationId}</Text>
-                  {attendee.ticketType && (
-                    <Text fontSize="sm">Ticket Type: {attendee.ticketType}</Text>
-                  )}
-                </VStack>
-              </VStack>
-              
-              <Text fontSize="sm" color="neutral.600">
-                Are you sure you want to manually check in this attendee?
+          {/* Body */}
+          <View style={styles.body}>
+            {/* Warning Alert */}
+            <View style={[styles.warningBox, { backgroundColor: colors.warning + '10', borderColor: colors.warning }]}>
+              <Icon
+                name="warning"
+                type="material"
+                color={colors.warning}
+                size={20}
+                containerStyle={styles.warningIcon}
+              />
+              <Text style={[styles.warningText, { color: colors.warning }]}>
+                Please verify the attendee's identity before checking them in manually.
               </Text>
-            </VStack>
-          </ModalBody>
+            </View>
+            
+            {/* Attendee Details */}
+            <View style={styles.detailsSection}>
+              <Text style={[styles.detailsTitle, { color: colors.text }]}>
+                Attendee Details:
+              </Text>
+              <View style={styles.detailsList}>
+                <Text style={[styles.detailItem, { color: colors.grey1 }]}>
+                  Name: {attendee.name}
+                </Text>
+                <Text style={[styles.detailItem, { color: colors.grey1 }]}>
+                  Email: {attendee.email}
+                </Text>
+                <Text style={[styles.detailItem, { color: colors.grey1 }]}>
+                  Registration ID: {attendee.registrationId}
+                </Text>
+                {attendee.ticketType && (
+                  <Text style={[styles.detailItem, { color: colors.grey1 }]}>
+                    Ticket Type: {attendee.ticketType}
+                  </Text>
+                )}
+              </View>
+            </View>
+            
+            <Text style={[styles.confirmText, { color: colors.grey2 }]}>
+              Are you sure you want to manually check in this attendee?
+            </Text>
+          </View>
 
-          <ModalFooter>
-            <HStack spacing={3}>
-              <Button variant="ghost" onClick={onClose} isDisabled={isLoading}>
-                Cancel
-              </Button>
-              <Button
-                colorScheme="primary"
-                leftIcon={<CheckIcon />}
-                onClick={handleConfirm}
-                isLoading={isLoading}
-                loadingText="Checking in..."
-              >
-                Confirm Check-In
-              </Button>
-            </HStack>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+          {/* Footer */}
+          <View style={styles.footer}>
+            <Button
+              title="Cancel"
+              type="clear"
+              onPress={() => setIsOpen(false)}
+              disabled={isLoading}
+              titleStyle={{ color: colors.grey2 }}
+              buttonStyle={styles.cancelButton}
+            />
+            <Button
+              title="Confirm Check-In"
+              loading={isLoading}
+              onPress={handleConfirm}
+              buttonStyle={[styles.confirmButton, { backgroundColor: colors.primary }]}
+              icon={
+                !isLoading && (
+                  <Icon
+                    name="check"
+                    type="material"
+                    color={colors.white}
+                    size={18}
+                    containerStyle={{ marginRight: 6 }}
+                  />
+                )
+              }
+            />
+          </View>
+        </View>
+      </Overlay>
     </>
   );
 };
+
+const styles = StyleSheet.create({
+  checkInButton: {
+    borderRadius: 6,
+    paddingHorizontal: 12,
+  },
+  overlay: {
+    borderRadius: 12,
+    padding: 0,
+    width: '90%',
+    maxWidth: 400,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e5',
+  },
+  headerTitle: {
+    fontWeight: '600',
+  },
+  body: {
+    padding: 20,
+    gap: 16,
+  },
+  warningBox: {
+    flexDirection: 'row',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  warningIcon: {
+    marginRight: 8,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  detailsSection: {
+    marginTop: 8,
+  },
+  detailsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  detailsList: {
+    paddingLeft: 16,
+    gap: 4,
+  },
+  detailItem: {
+    fontSize: 13,
+    marginBottom: 2,
+  },
+  confirmText: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 8,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e5e5',
+  },
+  cancelButton: {
+    paddingHorizontal: 16,
+  },
+  confirmButton: {
+    borderRadius: 6,
+    paddingHorizontal: 16,
+  },
+});

@@ -1,11 +1,11 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react';
-import { ChakraProvider } from '@chakra-ui/react';
+import { TestThemeProvider } from '../../../test-utils/theme-wrapper';
 import LoginForm from './LoginForm';
 
 // Wrapper component for tests
 const TestWrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider>{children}</ChakraProvider>
+  <TestThemeProvider>{children}</TestThemeProvider>
 );
 
 describe('LoginForm', () => {

@@ -1,6 +1,7 @@
 // Configure API base URL based on environment
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://jctop.zeabur.app/api/v1';
+const API_BASE_URL = process?.env?.EXPO_PUBLIC_API_URL || 'https://jctop.zeabur.app/api/v1';
 import { Event } from '@jctop-event/shared-types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import statisticsService, { EventStatistics } from './statisticsService';
 
 export interface DashboardAnalytics {
@@ -27,6 +28,7 @@ export class DashboardAnalyticsService {
   private static instance: DashboardAnalyticsService;
   private cache: { data: DashboardAnalytics; timestamp: number } | null = null;
   private readonly CACHE_DURATION = 60000; // 1 minute
+  private readonly OFFLINE_CACHE_KEY = 'dashboard_analytics_offline';
 
   static getInstance(): DashboardAnalyticsService {
     if (!DashboardAnalyticsService.instance) {
@@ -37,11 +39,26 @@ export class DashboardAnalyticsService {
 
   async getDashboardAnalytics(forceRefresh = false): Promise<DashboardAnalyticsServiceResponse> {
     try {
-      // Check cache first unless force refresh is requested
+      // Check memory cache first unless force refresh is requested
       if (!forceRefresh && this.cache) {
         const now = Date.now();
         if (now - this.cache.timestamp < this.CACHE_DURATION) {
           return { success: true, data: this.cache.data };
+        }
+      }
+
+      // Try to load from offline cache if not forcing refresh
+      if (!forceRefresh) {
+        const offlineData = await this.loadFromOfflineCache();
+        if (offlineData) {
+          // Update memory cache with offline data
+          this.cache = {
+            data: offlineData,
+            timestamp: Date.now()
+          };
+          // Return offline data but continue to fetch fresh data in background
+          this.fetchAndUpdateInBackground();
+          return { success: true, data: offlineData };
         }
       }
 
@@ -106,11 +123,14 @@ export class DashboardAnalyticsService {
         lastUpdated: new Date().toISOString(),
       };
 
-      // Cache the result
+      // Cache the result in memory
       this.cache = {
         data: analytics,
         timestamp: Date.now()
       };
+
+      // Save to offline cache
+      await this.saveToOfflineCache(analytics);
 
       return { success: true, data: analytics };
     } catch (error) {
@@ -134,10 +154,16 @@ export class DashboardAnalyticsService {
     return null;
   }
 
-  clearCache(): void {
+  async clearCache(): Promise<void> {
     this.cache = null;
     // Also clear statistics service cache
     statisticsService.clearCache();
+    // Clear offline cache
+    try {
+      await AsyncStorage.removeItem(this.OFFLINE_CACHE_KEY);
+    } catch (error) {
+      console.error('Failed to clear offline cache:', error);
+    }
   }
 
   // Helper method to get summary statistics
@@ -151,6 +177,56 @@ export class DashboardAnalyticsService {
       totalCheckedIn,
       attendanceRate: overallAttendanceRate
     };
+  }
+
+  // Offline cache methods
+  private async saveToOfflineCache(data: DashboardAnalytics): Promise<void> {
+    try {
+      const cacheData = {
+        data,
+        timestamp: Date.now(),
+        version: '1.0'
+      };
+      await AsyncStorage.setItem(this.OFFLINE_CACHE_KEY, JSON.stringify(cacheData));
+    } catch (error) {
+      console.error('Failed to save to offline cache:', error);
+    }
+  }
+
+  private async loadFromOfflineCache(): Promise<DashboardAnalytics | null> {
+    try {
+      const cachedString = await AsyncStorage.getItem(this.OFFLINE_CACHE_KEY);
+      if (!cachedString) return null;
+
+      const cached = JSON.parse(cachedString);
+      
+      // Check if cache is not too old (24 hours)
+      const now = Date.now();
+      const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+      if (now - cached.timestamp > maxAge) {
+        // Cache is too old, remove it
+        await AsyncStorage.removeItem(this.OFFLINE_CACHE_KEY);
+        return null;
+      }
+
+      return cached.data;
+    } catch (error) {
+      console.error('Failed to load from offline cache:', error);
+      return null;
+    }
+  }
+
+  private async fetchAndUpdateInBackground(): Promise<void> {
+    try {
+      // Fetch fresh data without using cache
+      const result = await this.getDashboardAnalytics(true);
+      if (result.success && result.data) {
+        // Data will be automatically cached by getDashboardAnalytics
+        console.log('Background data refresh completed');
+      }
+    } catch (error) {
+      console.error('Background refresh failed:', error);
+    }
   }
 }
 

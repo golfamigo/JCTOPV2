@@ -1,14 +1,10 @@
 import React from 'react';
-import {
-  Box,
-  Button,
-  HStack,
-  Text,
-  IconButton,
-  Select,
-  useColorModeValue,
-} from '@chakra-ui/react';
-import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons';
+import { View, TouchableOpacity, Platform } from 'react-native';
+import { Text, Button } from '@rneui/themed';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useAppTheme } from '@/theme';
+import { useSpacing } from '../../hooks/useSpacing';
+import { SharedSelect } from '../shared/SharedForm/SharedSelect';
 
 interface PaginationProps {
   currentPage: number;
@@ -33,11 +29,8 @@ const Pagination: React.FC<PaginationProps> = ({
   showPageSizeSelector = true,
   pageSizeOptions = [10, 20, 50],
 }) => {
-  // Design system colors following branding guide
-  const borderColor = useColorModeValue('#E2E8F0', '#475569');
-  const textColor = useColorModeValue('#0F172A', '#F8FAFC');
-  const mutedTextColor = useColorModeValue('#64748B', '#94A3B8');
-  const primaryColor = '#2563EB';
+  const { colors, typography } = useAppTheme();
+  const spacing = useSpacing();
 
   // Calculate the range of items being displayed
   const startItem = Math.min((currentPage - 1) * itemsPerPage + 1, totalItems);
@@ -49,33 +42,30 @@ const Pagination: React.FC<PaginationProps> = ({
     const maxVisible = 7; // Show at most 7 page buttons
 
     if (totalPages <= maxVisible) {
-      // Show all pages if total is small
+      // Show all pages if total is less than max
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i);
       }
     } else {
-      // Complex pagination logic
-      if (currentPage <= 4) {
-        // Show first 5 pages, then ellipsis, then last page
-        for (let i = 1; i <= 5; i++) {
+      // Always show first page
+      pages.push(1);
+
+      if (currentPage <= 3) {
+        // Near the beginning
+        for (let i = 2; i <= 5; i++) {
           pages.push(i);
         }
-        if (totalPages > 6) {
-          pages.push('...');
-          pages.push(totalPages);
-        }
-      } else if (currentPage >= totalPages - 3) {
-        // Show first page, ellipsis, then last 5 pages
-        pages.push(1);
-        if (totalPages > 6) {
-          pages.push('...');
-        }
-        for (let i = totalPages - 4; i <= totalPages; i++) {
+        pages.push('...');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        // Near the end
+        pages.push('...');
+        for (let i = totalPages - 4; i < totalPages; i++) {
           pages.push(i);
         }
+        pages.push(totalPages);
       } else {
-        // Show first page, ellipsis, current page area, ellipsis, last page
-        pages.push(1);
+        // In the middle
         pages.push('...');
         for (let i = currentPage - 1; i <= currentPage + 1; i++) {
           pages.push(i);
@@ -88,123 +78,152 @@ const Pagination: React.FC<PaginationProps> = ({
     return pages;
   };
 
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages && page !== currentPage && !isLoading) {
-      onPageChange(page);
+  const pageNumbers = getPageNumbers();
+
+  const PageButton: React.FC<{ 
+    page: number | string; 
+    isActive?: boolean;
+    onPress?: () => void;
+  }> = ({ page, isActive, onPress }) => {
+    if (page === '...') {
+      return (
+        <View style={{ 
+          ...spacing.padding(undefined, 'xs', 'sm'),
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <Text style={[typography.body, { color: colors.textSecondary }]}>
+            ...
+          </Text>
+        </View>
+      );
     }
+
+    return (
+      <TouchableOpacity
+        onPress={onPress}
+        disabled={isActive || isLoading}
+        style={{
+          backgroundColor: isActive ? colors.primary : 'transparent',
+          borderWidth: 1,
+          borderColor: isActive ? colors.primary : colors.border,
+          borderRadius: 6,
+          ...spacing.padding(undefined, 'xs', 'sm'),
+          minWidth: 36,
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: isLoading ? 0.5 : 1,
+        }}
+      >
+        <Text style={[
+          typography.body,
+          { 
+            color: isActive ? colors.white : colors.text,
+            fontWeight: isActive ? '600' : '400'
+          }
+        ]}>
+          {page}
+        </Text>
+      </TouchableOpacity>
+    );
   };
 
-  const handleItemsPerPageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const newItemsPerPage = parseInt(event.target.value, 10);
-    if (onItemsPerPageChange && !isLoading) {
-      onItemsPerPageChange(newItemsPerPage);
-    }
-  };
-
-  if (totalPages <= 1) {
-    return null; // Don't show pagination if there's only one page or no items
-  }
+  const pageSizeSelectOptions = pageSizeOptions.map(size => ({
+    label: `${size} per page`,
+    value: size
+  }));
 
   return (
-    <Box
-      display="flex"
-      flexDirection={{ base: 'column', md: 'row' }}
-      alignItems={{ base: 'stretch', md: 'center' }}
-      justifyContent="space-between"
-      gap={4}
-      p={4}
-      borderTop="1px solid"
-      borderColor={borderColor}
-      bg="transparent"
-    >
-      {/* Items info and page size selector */}
-      <HStack spacing={4} flexWrap="wrap">
-        <Text fontSize="sm" color={mutedTextColor} whiteSpace="nowrap">
-          Showing {startItem} to {endItem} of {totalItems} results
+    <View style={{
+      flexDirection: Platform.OS === 'web' ? 'row' : 'column',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      ...spacing.padding('md'),
+      backgroundColor: colors.white,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      gap: spacing.md
+    }}>
+      {/* Items info */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+        <Text style={[typography.small, { color: colors.textSecondary }]}>
+          Showing {startItem}-{endItem} of {totalItems} items
         </Text>
         
-        {showPageSizeSelector && onItemsPerPageChange && (
-          <HStack spacing={2}>
-            <Text fontSize="sm" color={mutedTextColor} whiteSpace="nowrap">
-              Show:
-            </Text>
-            <Select
-              size="sm"
+        {showPageSizeSelector && onItemsPerPageChange && Platform.OS === 'web' && (
+          <View style={{ width: 150 }}>
+            <SharedSelect
               value={itemsPerPage}
-              onChange={handleItemsPerPageChange}
-              disabled={isLoading}
-              width="auto"
-              minWidth="70px"
-            >
-              {pageSizeOptions.map(size => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </Select>
-          </HStack>
+              options={pageSizeSelectOptions}
+              onChange={(value) => onItemsPerPageChange(Number(value))}
+              placeholder="Items per page"
+            />
+          </View>
         )}
-      </HStack>
+      </View>
 
       {/* Pagination controls */}
-      <HStack spacing={1}>
+      <View style={{ 
+        flexDirection: 'row', 
+        alignItems: 'center',
+        gap: spacing.xs
+      }}>
         {/* Previous button */}
-        <IconButton
-          icon={<ChevronLeftIcon />}
-          size="sm"
-          variant="ghost"
-          isDisabled={currentPage === 1 || isLoading}
-          onClick={() => handlePageChange(currentPage - 1)}
-          aria-label="Previous page"
-        />
+        <TouchableOpacity
+          onPress={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1 || isLoading}
+          style={{
+            opacity: currentPage === 1 || isLoading ? 0.3 : 1,
+            padding: spacing.xs
+          }}
+        >
+          <MaterialIcons
+            name="chevron-left"
+            size={24}
+            color={currentPage === 1 ? colors.disabled : colors.text}
+          />
+        </TouchableOpacity>
 
         {/* Page numbers */}
-        {getPageNumbers().map((page, index) => {
-          if (page === '...') {
-            return (
-              <Text
-                key={`ellipsis-${index}`}
-                px={2}
-                py={1}
-                fontSize="sm"
-                color={mutedTextColor}
-              >
-                ...
-              </Text>
-            );
-          }
-
-          const pageNumber = page as number;
-          const isCurrentPage = pageNumber === currentPage;
-
-          return (
-            <Button
-              key={pageNumber}
-              size="sm"
-              variant={isCurrentPage ? 'solid' : 'ghost'}
-              colorScheme={isCurrentPage ? 'blue' : 'gray'}
-              isDisabled={isLoading}
-              onClick={() => handlePageChange(pageNumber)}
-              minWidth="32px"
-              aria-label={`Page ${pageNumber}`}
-              aria-current={isCurrentPage ? 'page' : undefined}
-            >
-              {pageNumber}
-            </Button>
-          );
-        })}
+        {pageNumbers.map((page, index) => (
+          <PageButton
+            key={`${page}-${index}`}
+            page={page}
+            isActive={page === currentPage}
+            onPress={() => typeof page === 'number' && onPageChange(page)}
+          />
+        ))}
 
         {/* Next button */}
-        <IconButton
-          icon={<ChevronRightIcon />}
-          size="sm"
-          variant="ghost"
-          isDisabled={currentPage === totalPages || isLoading}
-          onClick={() => handlePageChange(currentPage + 1)}
-          aria-label="Next page"
-        />
-      </HStack>
-    </Box>
+        <TouchableOpacity
+          onPress={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages || isLoading}
+          style={{
+            opacity: currentPage === totalPages || isLoading ? 0.3 : 1,
+            padding: spacing.xs
+          }}
+        >
+          <MaterialIcons
+            name="chevron-right"
+            size={24}
+            color={currentPage === totalPages ? colors.disabled : colors.text}
+          />
+        </TouchableOpacity>
+      </View>
+
+      {/* Mobile page size selector */}
+      {showPageSizeSelector && onItemsPerPageChange && Platform.OS !== 'web' && (
+        <View style={{ width: '100%' }}>
+          <SharedSelect
+            value={itemsPerPage}
+            options={pageSizeSelectOptions}
+            onChange={(value) => onItemsPerPageChange(Number(value))}
+            placeholder="Items per page"
+            fullWidth
+          />
+        </View>
+      )}
+    </View>
   );
 };
 

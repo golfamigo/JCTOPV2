@@ -1,26 +1,22 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ChakraProvider } from '@chakra-ui/react';
-import { BrowserRouter } from 'react-router-dom';
+import { NavigationContainer } from '@react-navigation/native';
 import ResetPasswordForm from './ResetPasswordForm';
 
-// Mock react-router-dom
+// Mock navigation
 const mockNavigate = jest.fn();
-let mockSearchParams = new URLSearchParams('token=valid-token');
+let mockRouteParams = { token: 'valid-token' };
 
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
-  useNavigate: () => mockNavigate,
-  useSearchParams: () => [mockSearchParams],
-  Link: ({ children, to, ...props }: any) => <a href={to} {...props}>{children}</a>,
+jest.mock('@react-navigation/native', () => ({
+  ...jest.requireActual('@react-navigation/native'),
+  useNavigation: () => ({ navigate: mockNavigate }),
+  useRoute: () => ({ params: mockRouteParams }),
 }));
 
 const TestWrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider>
-    <BrowserRouter>
-      {children}
-    </BrowserRouter>
-  </ChakraProvider>
+  <NavigationContainer>
+    {children}
+  </NavigationContainer>
 );
 
 describe('ResetPasswordForm', () => {

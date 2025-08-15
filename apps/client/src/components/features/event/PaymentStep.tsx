@@ -1,34 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  VStack,
-  HStack,
-  Button,
-  Text,
-  Heading,
-  Alert,
-  AlertIcon,
-  AlertDescription,
-  useColorModeValue,
-  Container,
-  Card,
-  CardBody,
-  useToast,
-  Divider,
-  SimpleGrid,
-  Spinner,
-  Center,
-  RadioGroup,
-  Radio,
-  Stack,
-  Badge,
-  Icon,
-} from '@chakra-ui/react';
-import { ArrowBackIcon, CheckIcon } from '@chakra-ui/icons';
-import { FaCreditCard } from 'react-icons/fa';
+import React, { useState } from 'react';
+import { ScrollView, View, StyleSheet, Alert, Dimensions, ActivityIndicator, Platform } from 'react-native';
+import { Card, Text, Button, Divider, ListItem, Icon, Badge } from '@rneui/themed';
+import { useTranslation } from 'react-i18next';
 import { Event, RegistrationFormData, PaymentResponse } from '@jctop-event/shared-types';
 import StepIndicator from '../../common/StepIndicator';
+import CreditCardForm, { CreditCardData } from '../../molecules/CreditCardForm';
+import PaymentSkeleton from '../../atoms/PaymentSkeleton';
 import paymentService from '../../../services/paymentService';
+import { useAppTheme } from '@/theme';
+import * as Linking from 'expo-linking';
 
 interface PaymentStepProps {
   event: Event;
@@ -45,33 +25,52 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
   onBack,
   isLoading = false,
 }) => {
+  const { t } = useTranslation();
+  const { colors, spacing, typography } = useAppTheme();
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('ALL');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paymentMethods] = useState(paymentService.getECPayPaymentMethods());
-  
-  const toast = useToast();
-  const bgColor = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const [creditCardData, setCreditCardData] = useState<CreditCardData | null>(null);
+  const [showSkeleton, setShowSkeleton] = useState(false);
+
+  const windowWidth = Dimensions.get('window').width;
+  const isTablet = windowWidth >= 768;
+  const isDesktop = windowWidth >= 1200;
+
+  const registrationSteps = [
+    { title: t('registration.steps.ticketSelection'), description: t('registration.steps.ticketSelectionDesc') },
+    { title: t('registration.steps.registration'), description: t('registration.steps.registrationDesc') },
+    { title: t('registration.steps.payment'), description: t('registration.steps.paymentDesc') },
+  ];
 
   const handlePaymentInitiation = async () => {
     if (isProcessing || isLoading) return;
 
+    // Validate credit card if credit card payment method selected
+    if (selectedPaymentMethod === 'Credit') {
+      if (!creditCardData || !creditCardData.isValid) {
+        setError(t('payment.invalidCardNumber'));
+        return;
+      }
+    }
+
     setIsProcessing(true);
+    setShowSkeleton(true);
     setError(null);
 
     try {
       // Validate payment amount
       const validation = paymentService.validateAmount(formData.totalAmount);
       if (!validation.valid) {
-        setError(validation.message || '金額驗證失敗');
+        setError(validation.message || t('payment.validationFailed'));
         return;
       }
 
       // Initiate event payment
       const paymentResponse = await paymentService.initiateEventPayment(event.id, {
         amount: formData.totalAmount,
-        description: `${event.title} - 活動報名`,
+        description: `${event.title} - ${t('events.registerForEvent')}`,
         paymentMethod: selectedPaymentMethod,
         metadata: {
           eventId: event.id,
@@ -84,225 +83,442 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
       });
 
       // Handle successful payment initiation
-      if (paymentResponse.status === 'requires_action' && paymentResponse.redirectUrl) {
+      if ((paymentResponse as any).status === 'requires_action' && paymentResponse.redirectUrl) {
         // For ECPay, redirect to payment page
-        window.location.href = paymentResponse.redirectUrl;
+        // In React Native, we use Linking to open the URL
+        const supported = await Linking.canOpenURL(paymentResponse.redirectUrl);
+        if (supported) {
+          await Linking.openURL(paymentResponse.redirectUrl);
+        } else {
+          Alert.alert(
+            t('payment.paymentFailed'),
+            t('payment.cannotOpenPaymentUrl'),
+            [{ text: t('common.confirm'), style: 'default' }]
+          );
+        }
       } else {
         onSuccess(paymentResponse);
       }
 
     } catch (err: any) {
       console.error('Payment initiation failed:', err);
-      setError(err.message || '支付初始化失敗，請稍後再試');
+      const errorMessage = err.message || t('payment.paymentFailed');
+      setError(errorMessage);
       
-      toast({
-        title: '支付失敗',
-        description: err.message || '支付初始化失敗，請稍後再試',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      Alert.alert(
+        t('payment.paymentFailed'),
+        errorMessage,
+        [{ text: t('common.confirm'), style: 'default' }]
+      );
     } finally {
       setIsProcessing(false);
+      setShowSkeleton(false);
     }
   };
 
   const getPaymentMethodIcon = (method: string) => {
     switch (method) {
       case 'Credit':
-        return FaCreditCard;
+        return { name: 'credit-card', type: 'material-community' };
       case 'ATM':
-        return CheckIcon;
+        return { name: 'bank', type: 'material-community' };
       case 'CVS':
       case 'BARCODE':
-        return CheckIcon;
+        return { name: 'barcode-scan', type: 'material-community' };
       case 'ApplePay':
+        return { name: 'apple', type: 'material-community' };
       case 'GooglePay':
-        return FaCreditCard;
+        return { name: 'google', type: 'material-community' };
       default:
-        return FaCreditCard;
+        return { name: 'wallet', type: 'material-community' };
     }
   };
 
   const getPaymentMethodColor = (method: string) => {
     switch (method) {
       case 'Credit':
-        return 'blue';
+        return colors.primary;
       case 'ATM':
-        return 'green';
+        return colors.success;
       case 'CVS':
       case 'BARCODE':
-        return 'orange';
+        return colors.warning;
       case 'ApplePay':
-        return 'gray';
+        return colors.midGrey;
       case 'GooglePay':
-        return 'red';
+        return colors.danger;
       default:
-        return 'purple';
+        return colors.primary;
     }
   };
 
-  return (
-    <Container maxW="4xl" py={8}>
-      <StepIndicator 
-        steps={[
-          { title: '選擇票券' },
-          { title: '填寫資訊' },
-          { title: '付款確認' }
-        ]}
-        currentStep={2} 
-      />
-      
-      <Box mt={8}>
-        <Heading as="h2" size="lg" mb={6} textAlign="center">
-          付款確認
-        </Heading>
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('zh-TW', {
+      style: 'currency',
+      currency: 'TWD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
 
-        <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
+  const handleCreditCardDataChange = (cardData: CreditCardData) => {
+    setCreditCardData(cardData);
+  };
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    contentContainer: {
+      padding: spacing.md,
+      paddingBottom: spacing.xl,
+      maxWidth: isDesktop ? 1200 : '100%',
+      alignSelf: 'center',
+      width: '100%',
+    },
+    pageTitle: {
+      ...typography.h1,
+      color: colors.primary,
+      marginBottom: spacing.sm,
+      textAlign: 'center',
+    },
+    gridContainer: {
+      flexDirection: isTablet ? 'row' : 'column',
+      gap: spacing.md,
+      marginTop: spacing.lg,
+    },
+    gridColumn: {
+      flex: isTablet ? 1 : undefined,
+    },
+    sectionCard: {
+      marginVertical: spacing.sm,
+    },
+    sectionTitle: {
+      ...typography.h2,
+      color: colors.primary,
+      marginBottom: spacing.md,
+    },
+    summaryRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginVertical: spacing.xs,
+    },
+    summaryLabel: {
+      ...typography.body,
+      color: colors.text,
+    },
+    summaryValue: {
+      ...typography.body,
+      color: colors.text,
+      fontWeight: '500',
+    },
+    discountRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginVertical: spacing.xs,
+    },
+    discountLabel: {
+      ...typography.body,
+      color: colors.success,
+    },
+    discountValue: {
+      ...typography.body,
+      color: colors.success,
+      fontWeight: '500',
+    },
+    totalRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: spacing.sm,
+      paddingTop: spacing.sm,
+    },
+    totalLabel: {
+      ...typography.h2,
+      color: colors.primary,
+      fontWeight: 'bold',
+    },
+    totalValue: {
+      ...typography.h2,
+      color: colors.primary,
+      fontWeight: 'bold',
+    },
+    paymentMethodItem: {
+      backgroundColor: colors.white,
+      borderRadius: 8,
+      marginBottom: spacing.sm,
+    },
+    selectedPaymentMethod: {
+      backgroundColor: colors.primary + '10',
+      borderColor: colors.primary,
+      borderWidth: 2,
+    },
+    paymentMethodContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+    },
+    paymentMethodText: {
+      ...typography.body,
+      flex: 1,
+      marginLeft: spacing.md,
+      color: colors.text,
+    },
+    badge: {
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.xs / 2,
+      borderRadius: 4,
+    },
+    badgeText: {
+      ...typography.small,
+      color: colors.white,
+      fontWeight: '600',
+    },
+    errorCard: {
+      backgroundColor: colors.danger + '10',
+      borderColor: colors.danger,
+      borderWidth: 1,
+      marginTop: spacing.md,
+    },
+    errorText: {
+      ...typography.body,
+      color: colors.danger,
+    },
+    securityCard: {
+      backgroundColor: colors.primary + '10',
+      borderColor: colors.primary,
+      borderLeftWidth: 4,
+      marginTop: spacing.md,
+    },
+    securityContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    securityText: {
+      ...typography.small,
+      color: colors.primary,
+      marginLeft: spacing.sm,
+      flex: 1,
+    },
+    actionContainer: {
+      marginTop: spacing.lg,
+    },
+    actionButtons: {
+      flexDirection: isTablet ? 'row' : 'column',
+      justifyContent: 'space-between',
+      alignItems: isTablet ? 'center' : 'stretch',
+      gap: spacing.md,
+    },
+    backButton: {
+      flex: isTablet ? 0 : 1,
+      minWidth: isTablet ? 150 : '100%',
+    },
+    payButton: {
+      flex: isTablet ? 0 : 1,
+      minWidth: isTablet ? 200 : '100%',
+      backgroundColor: colors.primary,
+    },
+  });
+
+  return (
+    <ScrollView style={styles.container}>
+      <View style={styles.contentContainer}>
+        <StepIndicator
+          steps={registrationSteps}
+          currentStep={2}
+        />
+
+        <Text style={styles.pageTitle}>{t('payment.paymentConfirmation')}</Text>
+
+        <View style={styles.gridContainer}>
           {/* Payment Summary */}
-          <Card bg={bgColor} borderWidth={1} borderColor={borderColor}>
-            <CardBody>
-              <Heading as="h3" size="md" mb={4}>
-                付款摘要
-              </Heading>
+          <View style={styles.gridColumn}>
+            <Card containerStyle={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>{t('payment.paymentSummary')}</Text>
               
-              <VStack spacing={3} align="stretch">
-                <HStack justify="space-between">
-                  <Text>活動名稱：</Text>
-                  <Text fontWeight="medium">{event.title}</Text>
-                </HStack>
-                
-                <Divider />
-                
-                {/* Ticket Summary */}
-                {formData.ticketSelections.map((selection, index) => (
-                  <HStack key={index} justify="space-between">
-                    <Text fontSize="sm">
-                      票券 {index + 1} × {selection.quantity}
-                    </Text>
-                    <Text fontSize="sm">
-                      {paymentService.formatAmount(
-                        (formData.totalAmount - (formData.discountAmount || 0)) / 
-                        formData.ticketSelections.reduce((sum, s) => sum + s.quantity, 0) * 
-                        selection.quantity
-                      )}
-                    </Text>
-                  </HStack>
-                ))}
-                
-                <Divider />
-                
-                <HStack justify="space-between">
-                  <Text>小計：</Text>
-                  <Text>{paymentService.formatAmount(formData.totalAmount)}</Text>
-                </HStack>
-                
-                {formData.discountAmount && formData.discountAmount > 0 && (
-                  <HStack justify="space-between" color="green.500">
-                    <Text>折扣：</Text>
-                    <Text>-{paymentService.formatAmount(formData.discountAmount)}</Text>
-                  </HStack>
-                )}
-                
-                <Divider />
-                
-                <HStack justify="space-between" fontWeight="bold" fontSize="lg">
-                  <Text>總計：</Text>
-                  <Text color="blue.500">
-                    {paymentService.formatAmount(
-                      formData.totalAmount - (formData.discountAmount || 0)
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>{t('events.eventName')}:</Text>
+                <Text style={styles.summaryValue}>{event.title}</Text>
+              </View>
+              
+              <Divider style={{ marginVertical: spacing.sm }} />
+              
+              {/* Ticket Summary */}
+              {formData.ticketSelections.map((selection, index) => (
+                <View key={index} style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>
+                    {t('registration.ticketQuantity')} × {selection.quantity}
+                  </Text>
+                  <Text style={styles.summaryValue}>
+                    {formatCurrency(
+                      (formData.totalAmount - (formData.discountAmount || 0)) / 
+                      formData.ticketSelections.reduce((sum, s) => sum + s.quantity, 0) * 
+                      selection.quantity
                     )}
                   </Text>
-                </HStack>
-              </VStack>
-            </CardBody>
-          </Card>
+                </View>
+              ))}
+              
+              <Divider style={{ marginVertical: spacing.sm }} />
+              
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>{t('registration.subtotal')}:</Text>
+                <Text style={styles.summaryValue}>{formatCurrency(formData.totalAmount)}</Text>
+              </View>
+              
+              {formData.discountAmount && formData.discountAmount > 0 && (
+                <View style={styles.discountRow}>
+                  <Text style={styles.discountLabel}>{t('registration.discount')}:</Text>
+                  <Text style={styles.discountValue}>
+                    -{formatCurrency(formData.discountAmount)}
+                  </Text>
+                </View>
+              )}
+              
+              <Divider style={{ marginVertical: spacing.sm }} />
+              
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>{t('registration.total')}:</Text>
+                <Text style={styles.totalValue}>
+                  {formatCurrency(formData.totalAmount - (formData.discountAmount || 0))}
+                </Text>
+              </View>
+            </Card>
+          </View>
 
           {/* Payment Method Selection */}
-          <Card bg={bgColor} borderWidth={1} borderColor={borderColor}>
-            <CardBody>
-              <Heading as="h3" size="md" mb={4}>
-                選擇付款方式
-              </Heading>
+          <View style={styles.gridColumn}>
+            <Card containerStyle={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>{t('registration.selectPaymentMethod')}</Text>
               
-              <RadioGroup 
-                value={selectedPaymentMethod} 
-                onChange={setSelectedPaymentMethod}
-              >
-                <Stack spacing={3}>
-                  {paymentMethods.map((method) => (
-                    <Box
-                      key={method.code}
-                      p={3}
-                      borderWidth={1}
-                      borderRadius="md"
-                      borderColor={selectedPaymentMethod === method.code ? 'blue.500' : 'gray.200'}
-                      bg={selectedPaymentMethod === method.code ? 'blue.50' : 'transparent'}
-                      _hover={{ borderColor: 'blue.300' }}
-                      cursor="pointer"
-                      onClick={() => setSelectedPaymentMethod(method.code)}
-                    >
-                      <HStack spacing={3}>
-                        <Radio value={method.code} />
-                        <Icon as={getPaymentMethodIcon(method.code)} color="gray.500" />
-                        <Text flex={1}>{method.name}</Text>
-                        <Badge 
-                          colorScheme={getPaymentMethodColor(method.code)} 
-                          variant="subtle"
-                        >
-                          {method.code}
-                        </Badge>
-                      </HStack>
-                    </Box>
-                  ))}
-                </Stack>
-              </RadioGroup>
-            </CardBody>
-          </Card>
-        </SimpleGrid>
+              {paymentMethods.map((method) => {
+                const iconInfo = getPaymentMethodIcon(method.code);
+                const isSelected = selectedPaymentMethod === method.code;
+                
+                return (
+                  <ListItem
+                    key={method.code}
+                    containerStyle={[
+                      styles.paymentMethodItem,
+                      isSelected && styles.selectedPaymentMethod,
+                    ]}
+                    onPress={() => setSelectedPaymentMethod(method.code)}
+                  >
+                    <Icon
+                      name={isSelected ? 'radiobox-marked' : 'radiobox-blank'}
+                      type="material-community"
+                      size={24}
+                      color={isSelected ? colors.primary : colors.midGrey}
+                    />
+                    <Icon
+                      name={iconInfo.name}
+                      type={iconInfo.type}
+                      size={20}
+                      color={colors.midGrey}
+                    />
+                    <ListItem.Content>
+                      <ListItem.Title style={styles.paymentMethodText}>
+                        {method.name}
+                      </ListItem.Title>
+                    </ListItem.Content>
+                    <View style={[styles.badge, { backgroundColor: getPaymentMethodColor(method.code) }]}>
+                      <Text style={styles.badgeText}>{method.code}</Text>
+                    </View>
+                  </ListItem>
+                );
+              })}
+            </Card>
+          </View>
+        </View>
+
+        {/* Credit Card Form - Show only when Credit is selected */}
+        {selectedPaymentMethod === 'Credit' && !showSkeleton && (
+          <CreditCardForm 
+            onCardDataChange={handleCreditCardDataChange}
+            disabled={isProcessing || isLoading}
+          />
+        )}
+
+        {/* Skeleton Loading */}
+        {showSkeleton && (
+          <>
+            <PaymentSkeleton variant="form" />
+            <PaymentSkeleton variant="methods" />
+          </>
+        )}
 
         {/* Error Alert */}
         {error && (
-          <Alert status="error" mt={6} borderRadius="md">
-            <AlertIcon />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+          <Card containerStyle={styles.errorCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Icon name="alert-circle" type="material-community" size={24} color={colors.danger} />
+              <Text style={[styles.errorText, { marginLeft: spacing.sm, flex: 1 }]}>
+                {error}
+              </Text>
+            </View>
+          </Card>
         )}
 
         {/* Payment Security Notice */}
-        <Box mt={6} p={4} bg="blue.50" borderRadius="md" borderLeft="4px solid" borderLeftColor="blue.400">
-          <HStack spacing={2}>
-            <Icon as={CheckIcon} color="blue.500" />
-            <Text fontSize="sm" color="blue.700">
-              您的付款資訊將透過安全加密傳輸，我們不會儲存您的信用卡資訊。
+        <Card containerStyle={styles.securityCard}>
+          <View style={styles.securityContent}>
+            <Icon name="shield-check" type="material-community" size={20} color={colors.primary} />
+            <Text style={styles.securityText}>
+              {t('payment.securityNotice')}
             </Text>
-          </HStack>
-        </Box>
+          </View>
+        </Card>
 
         {/* Navigation Buttons */}
-        <HStack justify="space-between" mt={8}>
-          <Button
-            leftIcon={<ArrowBackIcon />}
-            variant="outline"
-            onClick={onBack}
-            isDisabled={isProcessing || isLoading}
-          >
-            返回
-          </Button>
-          
-          <Button
-            colorScheme="blue"
-            size="lg"
-            onClick={handlePaymentInitiation}
-            isLoading={isProcessing || isLoading}
-            loadingText="處理中..."
-            rightIcon={isProcessing ? <Spinner size="sm" /> : <Icon as={FaCreditCard} />}
-          >
-            {isProcessing ? '處理中...' : '前往付款'}
-          </Button>
-        </HStack>
-      </Box>
-    </Container>
+        <View style={styles.actionContainer}>
+          <View style={styles.actionButtons}>
+            <Button
+              title={t('common.back')}
+              type="outline"
+              icon={
+                <Icon
+                  name="arrow-left"
+                  type="material-community"
+                  size={20}
+                  color={colors.midGrey}
+                  style={{ marginRight: spacing.xs }}
+                />
+              }
+              onPress={onBack}
+              disabled={isProcessing || isLoading}
+              buttonStyle={styles.backButton}
+              titleStyle={{ color: colors.midGrey }}
+            />
+
+            <Button
+              title={isProcessing ? t('payment.processingPayment') : t('payment.proceedToPayment')}
+              icon={
+                isProcessing ? undefined : (
+                  <Icon
+                    name="credit-card"
+                    type="material-community"
+                    size={20}
+                    color={colors.white}
+                    style={{ marginLeft: spacing.xs }}
+                  />
+                )
+              }
+              iconPosition="right"
+              onPress={handlePaymentInitiation}
+              loading={isProcessing || isLoading}
+              loadingProps={{ color: colors.white }}
+              disabled={isLoading}
+              buttonStyle={styles.payButton}
+              titleStyle={{ color: colors.white }}
+            />
+          </View>
+        </View>
+      </View>
+    </ScrollView>
   );
 };
 

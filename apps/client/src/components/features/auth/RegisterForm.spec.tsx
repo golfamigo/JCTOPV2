@@ -1,12 +1,9 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { ChakraProvider } from '@chakra-ui/react';
 import RegisterForm from './RegisterForm';
-import theme from '../../../theme';
+import theme from '@/theme';
 
 // Mock toast since it's now used instead of Alert
-jest.mock('@chakra-ui/react', () => ({
-  ...jest.requireActual('@chakra-ui/react'),
   useToast: () => jest.fn(),
 }));
 
@@ -164,7 +161,6 @@ describe('RegisterForm', () => {
 
   it('should handle registration error with toast notification', async () => {
     const mockToast = jest.fn();
-    jest.mocked(require('@chakra-ui/react').useToast).mockReturnValue(mockToast);
 
     const { getByPlaceholderText, getByText } = renderWithChakra(
       <RegisterForm onRegister={mockOnRegister} />

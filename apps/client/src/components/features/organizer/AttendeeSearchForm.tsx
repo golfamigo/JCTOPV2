@@ -1,20 +1,8 @@
 import React, { useState } from 'react';
-import {
-  Box,
-  Input,
-  InputGroup,
-  InputLeftElement,
-  InputRightElement,
-  Button,
-  IconButton,
-  FormControl,
-  FormLabel,
-  VStack,
-  HStack,
-  Text,
-  useColorModeValue,
-} from '@chakra-ui/react';
-import { SearchIcon, CloseIcon } from '@chakra-ui/icons';
+import { View, StyleSheet, TextInput } from 'react-native';
+import { Button, Text, Icon } from '@rneui/themed';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useAppTheme } from '../../../theme';
 
 interface AttendeeSearchFormProps {
   onSearch: (query: string) => void;
@@ -28,11 +16,9 @@ export const AttendeeSearchForm: React.FC<AttendeeSearchFormProps> = ({
   onClear,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const borderColor = useColorModeValue('neutral.200', 'neutral.600');
-  const inputBgColor = useColorModeValue('white', 'neutral.800');
+  const { colors } = useAppTheme();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = () => {
     if (searchQuery.trim()) {
       onSearch(searchQuery.trim());
     }
@@ -44,62 +30,125 @@ export const AttendeeSearchForm: React.FC<AttendeeSearchFormProps> = ({
   };
 
   return (
-    <Box as="form" onSubmit={handleSubmit} w="100%">
-      <VStack spacing={4} align="stretch">
-        <FormControl>
-          <FormLabel color="neutral.700" fontSize="sm" fontWeight="medium">
-            Search for Attendee
-          </FormLabel>
-          <InputGroup size="lg">
-            <InputLeftElement pointerEvents="none">
-              <SearchIcon color="neutral.400" />
-            </InputLeftElement>
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Enter name or registration number"
-              borderColor={borderColor}
-              bg={inputBgColor}
-              _focus={{
-                borderColor: 'primary.500',
-                boxShadow: '0 0 0 1px var(--chakra-colors-primary-500)',
-              }}
-              disabled={isSearching}
-            />
-            {searchQuery && (
-              <InputRightElement>
-                <IconButton
-                  aria-label="Clear search"
-                  icon={<CloseIcon />}
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleClear}
-                  isDisabled={isSearching}
-                />
-              </InputRightElement>
-            )}
-          </InputGroup>
-        </FormControl>
-        
-        <HStack spacing={3}>
-          <Button
-            type="submit"
-            colorScheme="primary"
-            leftIcon={<SearchIcon />}
-            isLoading={isSearching}
-            loadingText="Searching..."
-            isDisabled={!searchQuery.trim()}
-            size="md"
-            flex={1}
-          >
-            Search
-          </Button>
-        </HStack>
-        
-        <Text fontSize="xs" color="neutral.500" textAlign="center">
-          Search by attendee name or registration ID
+    <View style={styles.container}>
+      <View style={styles.formControl}>
+        <Text style={[styles.label, { color: colors.grey1 }]}>
+          Search for Attendee
         </Text>
-      </VStack>
-    </Box>
+        
+        <View style={[styles.inputGroup, { 
+          backgroundColor: colors.card,
+          borderColor: colors.grey4
+        }]}>
+          <Icon
+            name="search"
+            type="material"
+            color={colors.grey3}
+            size={24}
+            containerStyle={styles.searchIcon}
+          />
+          
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Enter name or registration number"
+            placeholderTextColor={colors.grey3}
+            style={[styles.input, { color: colors.text }]}
+            editable={!isSearching}
+            onSubmitEditing={handleSubmit}
+          />
+          
+          {searchQuery ? (
+            <Icon
+              name="close"
+              type="material"
+              color={colors.grey3}
+              size={20}
+              onPress={handleClear}
+              disabled={isSearching}
+              containerStyle={styles.clearIcon}
+            />
+          ) : null}
+        </View>
+      </View>
+      
+      <View style={styles.buttonContainer}>
+        <Button
+          title="Search"
+          onPress={handleSubmit}
+          loading={isSearching}
+          loadingProps={{ color: colors.white }}
+          disabled={!searchQuery.trim() || isSearching}
+          buttonStyle={[styles.searchButton, { backgroundColor: colors.primary }]}
+          titleStyle={styles.buttonTitle}
+          icon={
+            !isSearching ? (
+              <Icon
+                name="search"
+                type="material"
+                color={colors.white}
+                size={20}
+                containerStyle={styles.buttonIcon}
+              />
+            ) : undefined
+          }
+        />
+      </View>
+      
+      <Text style={[styles.helpText, { color: colors.grey2 }]}>
+        Search by attendee name or registration ID
+      </Text>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    width: '100%',
+  },
+  formControl: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  inputGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 48,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 12,
+  },
+  clearIcon: {
+    padding: 4,
+  },
+  buttonContainer: {
+    marginBottom: 12,
+  },
+  searchButton: {
+    borderRadius: 8,
+    paddingVertical: 12,
+  },
+  buttonTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  buttonIcon: {
+    marginRight: 8,
+  },
+  helpText: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+});

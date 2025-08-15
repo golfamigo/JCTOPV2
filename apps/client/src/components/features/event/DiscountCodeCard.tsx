@@ -1,25 +1,10 @@
-import React from 'react';
-import {
-  Box,
-  Text,
-  Badge,
-  HStack,
-  VStack,
-  IconButton,
-  useColorModeValue,
-  Tooltip,
-  AlertDialog,
-  AlertDialogBody,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogContent,
-  AlertDialogOverlay,
-  Button,
-  useDisclosure,
-  useToast,
-} from '@chakra-ui/react';
-import { EditIcon, DeleteIcon, CopyIcon } from '@chakra-ui/icons';
+import React, { useState } from 'react';
+import { View, StyleSheet, TouchableOpacity, Alert, Share, Platform } from 'react-native';
+import { Text, Badge, Button, Icon, Overlay } from '@rneui/themed';
+import { MaterialIcons } from '@expo/vector-icons';
 import { DiscountCodeResponse } from '@jctop-event/shared-types';
+import { useAppTheme } from '../../../theme';
+import * as Clipboard from 'expo-clipboard';
 
 interface DiscountCodeCardProps {
   discountCode: DiscountCodeResponse;
@@ -34,18 +19,14 @@ const DiscountCodeCard: React.FC<DiscountCodeCardProps> = ({
   onDelete,
   isLoading = false,
 }) => {
-  const toast = useToast();
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const cancelRef = React.useRef<HTMLButtonElement>(null);
-  
-  const cardBg = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.600');
-  const textColor = useColorModeValue('gray.600', 'gray.300');
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const { colors } = useAppTheme();
 
   const isExpired = discountCode.expiresAt && new Date(discountCode.expiresAt) < new Date();
   
   const getTypeColor = () => {
-    return discountCode.type === 'percentage' ? 'blue' : 'green';
+    return discountCode.type === 'percentage' ? colors.primary : colors.success;
   };
 
   const getValueDisplay = () => {
@@ -56,8 +37,8 @@ const DiscountCodeCard: React.FC<DiscountCodeCardProps> = ({
   };
 
   const getStatusColor = () => {
-    if (isExpired) return 'red';
-    return 'green';
+    if (isExpired) return colors.error;
+    return colors.success;
   };
 
   const getStatusText = () => {
@@ -67,31 +48,27 @@ const DiscountCodeCard: React.FC<DiscountCodeCardProps> = ({
 
   const copyToClipboard = async () => {
     try {
-      await navigator.clipboard.writeText(discountCode.code);
-      toast({
-        title: 'Copied to clipboard',
-        description: `Discount code "${discountCode.code}" copied successfully`,
-        status: 'success',
-        duration: 2000,
-        isClosable: true,
-      });
+      if (Platform.OS === 'web') {
+        await navigator.clipboard.writeText(discountCode.code);
+      } else {
+        await Clipboard.setStringAsync(discountCode.code);
+      }
+      Alert.alert('Success', `Discount code "${discountCode.code}" copied to clipboard`);
     } catch (error) {
-      toast({
-        title: 'Failed to copy',
-        description: 'Could not copy discount code to clipboard',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
+      Alert.alert('Error', 'Could not copy discount code to clipboard');
     }
   };
 
   const handleDelete = async () => {
+    setIsDeleting(true);
     try {
       await onDelete(discountCode.id);
-      onClose();
+      setShowDeleteDialog(false);
     } catch (error) {
       console.error('Error deleting discount code:', error);
+      Alert.alert('Error', 'Failed to delete discount code');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -108,148 +85,246 @@ const DiscountCodeCard: React.FC<DiscountCodeCardProps> = ({
 
   return (
     <>
-      <Box
-        p={4}
-        bg={cardBg}
-        borderWidth={1}
-        borderColor={borderColor}
-        borderRadius="md"
-        shadow="sm"
-        _hover={{ shadow: 'md' }}
-        transition="box-shadow 0.2s"
-      >
-        <VStack align="stretch" spacing={3}>
-          <HStack justify="space-between" align="flex-start">
-            <VStack align="flex-start" spacing={1} flex={1}>
-              <HStack>
-                <Text fontSize="lg" fontWeight="bold" fontFamily="mono">
-                  {discountCode.code}
-                </Text>
-                <Tooltip label="Copy code">
-                  <IconButton
-                    aria-label="Copy discount code"
-                    icon={<CopyIcon />}
-                    size="sm"
-                    variant="ghost"
-                    onClick={copyToClipboard}
-                  />
-                </Tooltip>
-              </HStack>
-              
-              <HStack spacing={2}>
-                <Badge colorScheme={getTypeColor()} variant="subtle">
-                  {discountCode.type === 'percentage' ? 'Percentage' : 'Fixed Amount'}
-                </Badge>
-                <Badge colorScheme={getStatusColor()} variant="outline">
-                  {getStatusText()}
-                </Badge>
-              </HStack>
-            </VStack>
-
-            <HStack>
-              <Tooltip label="Edit discount code">
-                <IconButton
-                  aria-label="Edit discount code"
-                  icon={<EditIcon />}
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => onEdit(discountCode)}
-                  isDisabled={isLoading}
+      <View style={[styles.card, { 
+        backgroundColor: colors.card,
+        borderColor: colors.grey4
+      }]}>
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <View style={styles.codeRow}>
+              <Text style={[styles.codeText, { color: colors.text }]}>
+                {discountCode.code}
+              </Text>
+              <TouchableOpacity onPress={copyToClipboard} style={styles.iconButton}>
+                <Icon
+                  name="content-copy"
+                  type="material"
+                  color={colors.grey2}
+                  size={18}
                 />
-              </Tooltip>
-              
-              <Tooltip label="Delete discount code">
-                <IconButton
-                  aria-label="Delete discount code"
-                  icon={<DeleteIcon />}
-                  size="sm"
-                  variant="ghost"
-                  colorScheme="red"
-                  onClick={onOpen}
-                  isDisabled={isLoading}
-                />
-              </Tooltip>
-            </HStack>
-          </HStack>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.badgeRow}>
+              <Badge
+                value={discountCode.type === 'percentage' ? 'Percentage' : 'Fixed Amount'}
+                badgeStyle={[styles.badge, { backgroundColor: getTypeColor() }]}
+                textStyle={styles.badgeText}
+              />
+              <Badge
+                value={getStatusText()}
+                badgeStyle={[styles.badge, styles.statusBadge, { 
+                  borderColor: getStatusColor(),
+                  backgroundColor: 'transparent'
+                }]}
+                textStyle={[styles.badgeText, { color: getStatusColor() }]}
+              />
+            </View>
+          </View>
 
-          <VStack align="stretch" spacing={2}>
-            <HStack justify="space-between">
-              <Text fontSize="sm" color={textColor}>
-                Discount Value:
-              </Text>
-              <Text fontSize="lg" fontWeight="semibold" color="blue.500">
-                {getValueDisplay()}
-              </Text>
-            </HStack>
+          <View style={styles.headerActions}>
+            <TouchableOpacity 
+              onPress={() => onEdit(discountCode)}
+              disabled={isLoading}
+              style={styles.iconButton}
+            >
+              <Icon
+                name="edit"
+                type="material"
+                color={colors.grey2}
+                size={20}
+              />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              onPress={() => setShowDeleteDialog(true)}
+              disabled={isLoading}
+              style={styles.iconButton}
+            >
+              <Icon
+                name="delete"
+                type="material"
+                color={colors.error}
+                size={20}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
 
-            <HStack justify="space-between">
-              <Text fontSize="sm" color={textColor}>
-                Usage Count:
-              </Text>
-              <Text fontSize="sm" fontWeight="medium">
-                {discountCode.usageCount} times
-              </Text>
-            </HStack>
+        <View style={styles.details}>
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, { color: colors.grey2 }]}>
+              Discount Value:
+            </Text>
+            <Text style={[styles.detailValue, styles.discountValue, { color: colors.primary }]}>
+              {getValueDisplay()}
+            </Text>
+          </View>
 
-            <HStack justify="space-between">
-              <Text fontSize="sm" color={textColor}>
-                Expires:
-              </Text>
-              <Text 
-                fontSize="sm" 
-                fontWeight="medium"
-                color={isExpired ? 'red.500' : 'gray.700'}
-              >
-                {formatDate(discountCode.expiresAt)}
-              </Text>
-            </HStack>
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, { color: colors.grey2 }]}>
+              Usage Count:
+            </Text>
+            <Text style={[styles.detailValue, { color: colors.text }]}>
+              {discountCode.usageCount} times
+            </Text>
+          </View>
 
-            <HStack justify="space-between">
-              <Text fontSize="sm" color={textColor}>
-                Created:
-              </Text>
-              <Text fontSize="sm">
-                {formatDate(discountCode.createdAt)}
-              </Text>
-            </HStack>
-          </VStack>
-        </VStack>
-      </Box>
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, { color: colors.grey2 }]}>
+              Expires:
+            </Text>
+            <Text style={[styles.detailValue, { 
+              color: isExpired ? colors.error : colors.text 
+            }]}>
+              {formatDate(discountCode.expiresAt)}
+            </Text>
+          </View>
 
-      <AlertDialog
-        isOpen={isOpen}
-        leastDestructiveRef={cancelRef}
-        onClose={onClose}
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, { color: colors.grey2 }]}>
+              Created:
+            </Text>
+            <Text style={[styles.detailValue, { color: colors.grey3 }]}>
+              {formatDate(discountCode.createdAt)}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Delete Confirmation Dialog */}
+      <Overlay
+        isVisible={showDeleteDialog}
+        onBackdropPress={() => setShowDeleteDialog(false)}
+        overlayStyle={[styles.deleteDialog, { backgroundColor: colors.card }]}
       >
-        <AlertDialogOverlay>
-          <AlertDialogContent>
-            <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              Delete Discount Code
-            </AlertDialogHeader>
-
-            <AlertDialogBody>
-              Are you sure you want to delete the discount code "{discountCode.code}"? 
-              This action cannot be undone.
-            </AlertDialogBody>
-
-            <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={onClose}>
-                Cancel
-              </Button>
-              <Button 
-                colorScheme="red" 
-                onClick={handleDelete} 
-                ml={3}
-                isLoading={isLoading}
-              >
-                Delete
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialogOverlay>
-      </AlertDialog>
+        <View>
+          <Text h4 style={[styles.dialogTitle, { color: colors.text }]}>
+            Delete Discount Code
+          </Text>
+          
+          <Text style={[styles.dialogMessage, { color: colors.grey2 }]}>
+            Are you sure you want to delete the discount code "{discountCode.code}"? 
+            This action cannot be undone.
+          </Text>
+          
+          <View style={styles.dialogButtons}>
+            <Button
+              title="Cancel"
+              onPress={() => setShowDeleteDialog(false)}
+              type="outline"
+              buttonStyle={[styles.dialogButton, { borderColor: colors.grey3 }]}
+              titleStyle={{ color: colors.text }}
+            />
+            <Button
+              title="Delete"
+              onPress={handleDelete}
+              loading={isDeleting}
+              buttonStyle={[styles.dialogButton, { backgroundColor: colors.error }]}
+            />
+          </View>
+        </View>
+      </Overlay>
     </>
   );
 };
+
+const styles = StyleSheet.create({
+  card: {
+    padding: 16,
+    borderWidth: 1,
+    borderRadius: 8,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  codeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  codeText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  badge: {
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  statusBadge: {
+    borderWidth: 1,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  iconButton: {
+    padding: 8,
+  },
+  details: {
+    gap: 12,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  detailLabel: {
+    fontSize: 14,
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  discountValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  deleteDialog: {
+    borderRadius: 12,
+    padding: 24,
+    width: '90%',
+    maxWidth: 400,
+  },
+  dialogTitle: {
+    marginBottom: 16,
+    fontWeight: 'bold',
+  },
+  dialogMessage: {
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  dialogButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  dialogButton: {
+    borderRadius: 6,
+    paddingHorizontal: 20,
+  },
+});
 
 export default DiscountCodeCard;

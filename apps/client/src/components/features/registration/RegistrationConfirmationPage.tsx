@@ -1,31 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import {
-  Box,
-  VStack,
-  HStack,
+  View,
+  ScrollView,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  Linking,
+} from 'react-native';
+import {
   Button,
   Text,
-  Heading,
-  Alert,
-  AlertIcon,
-  AlertDescription,
-  useColorModeValue,
-  Container,
   Card,
-  CardBody,
   Image,
   Divider,
-  Spinner,
-  Center,
   Icon,
   Badge,
-  useToast,
-  Flex,
-  SimpleGrid,
-  Link,
-} from '@chakra-ui/react';
-import { CheckIcon, DownloadIcon, ViewIcon, ExternalLinkIcon } from '@chakra-ui/icons';
+} from '@rneui/themed';
 import { Registration } from '@jctop-event/shared-types';
 import registrationService from '../../../services/registrationService';
 
@@ -34,17 +25,12 @@ interface RegistrationConfirmationPageProps {
 }
 
 const RegistrationConfirmationPage: React.FC<RegistrationConfirmationPageProps> = ({
-  registrationId,
+  registrationId
 }) => {
+  const router = useRouter();
   const [registration, setRegistration] = useState<Registration | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
-  const toast = useToast();
-
-  const bgColor = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.600');
-  const cardBgColor = useColorModeValue('gray.50', 'gray.700');
 
   useEffect(() => {
     loadRegistration();
@@ -53,297 +39,342 @@ const RegistrationConfirmationPage: React.FC<RegistrationConfirmationPageProps> 
   const loadRegistration = async () => {
     try {
       setIsLoading(true);
-      const registrationData = await registrationService.getRegistration(registrationId);
-      setRegistration(registrationData);
+      const data = await registrationService.getRegistration(registrationId);
+      setRegistration(data);
     } catch (err: any) {
-      console.error('Error loading registration:', err);
-      setError(err.message || '無法載入報名資訊');
+      setError(err.message || 'Failed to load registration');
+      Alert.alert('Error', err.message || 'Failed to load registration');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleDownloadQR = () => {
-    if (!registration?.qrCode) return;
-
-    const link = document.createElement('a');
-    link.href = registration.qrCode;
-    link.download = `ticket-${registration.id}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    toast({
-      title: 'QR Code 已下載',
-      description: '您的電子票券已下載完成',
-      status: 'success',
-      duration: 3000,
-    });
+  const handleViewTickets = () => {
+    router.push('/tickets');
   };
 
-  const handleViewMyTickets = () => {
-    router.push('/user/tickets');
-  };
-
-  const handleBackToEvent = () => {
-    if (registration?.eventId) {
-      router.push(`/event/${registration.eventId}`);
-    } else {
-      router.push('/events');
-    }
+  const handleContactSupport = () => {
+    Linking.openURL('mailto:support@jctop.com');
   };
 
   if (isLoading) {
     return (
-      <Container maxW="4xl" py={8}>
-        <Card bg={bgColor} borderWidth={1} borderColor={borderColor}>
-          <CardBody>
-            <Center>
-              <VStack spacing={4}>
-                <Spinner size="xl" color="green.500" />
-                <Text>載入報名資訊中...</Text>
-              </VStack>
-            </Center>
-          </CardBody>
-        </Card>
-      </Container>
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#3182CE" />
+        <Text style={styles.loadingText}>Loading registration...</Text>
+      </View>
     );
   }
 
-  if (error) {
+  if (error || !registration) {
     return (
-      <Container maxW="4xl" py={8}>
-        <Card bg={bgColor} borderWidth={1} borderColor={borderColor}>
-          <CardBody>
-            <Alert status="error">
-              <AlertIcon />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-            <Button mt={4} onClick={() => router.back()}>
-              返回
-            </Button>
-          </CardBody>
-        </Card>
-      </Container>
+      <View style={styles.centerContainer}>
+        <Icon name="error" type="material" color="#E53E3E" size={48} />
+        <Text style={styles.errorText}>{error || 'Registration not found'}</Text>
+        <Button
+          title="Try Again"
+          onPress={loadRegistration}
+          buttonStyle={styles.retryButton}
+        />
+      </View>
     );
   }
-
-  if (!registration) {
-    return (
-      <Container maxW="4xl" py={8}>
-        <Card bg={bgColor} borderWidth={1} borderColor={borderColor}>
-          <CardBody>
-            <Text>找不到報名資訊</Text>
-          </CardBody>
-        </Card>
-      </Container>
-    );
-  }
-
-  const formatTicketSelections = (selections: any[]) => {
-    return selections.map((selection, index) => (
-      <HStack key={index} justify="space-between" w="full">
-        <Text fontSize="sm">票種 {index + 1}</Text>
-        <Text fontSize="sm" fontWeight="medium">
-          {selection.quantity} 張 × NT$ {selection.price.toLocaleString()}
-        </Text>
-      </HStack>
-    ));
-  };
 
   return (
-    <Container maxW="4xl" py={8}>
-      <VStack spacing={8} align="stretch">
-        {/* Success Header */}
-        <Card bg="green.50" borderWidth={2} borderColor="green.200">
-          <CardBody>
-            <VStack spacing={4} textAlign="center">
-              <Icon as={CheckIcon} boxSize={16} color="green.500" />
-              <Heading as="h1" size="xl" color="green.700">
-                報名成功！
-              </Heading>
-              <Text color="green.600" fontSize="lg">
-                恭喜您已成功完成活動報名，您將收到確認郵件
+    <ScrollView style={styles.container}>
+      <Card containerStyle={styles.card}>
+        <View style={styles.successHeader}>
+          <Icon
+            name="check-circle"
+            type="material"
+            color="#48BB78"
+            size={64}
+          />
+          <Text h3 style={styles.successTitle}>Registration Confirmed!</Text>
+          <Text style={styles.successSubtitle}>
+            Your registration has been successfully completed
+          </Text>
+        </View>
+
+        <Divider style={styles.divider} />
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Registration Details</Text>
+          
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Registration ID:</Text>
+            <Text style={styles.detailValue}>{registration.id}</Text>
+          </View>
+
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Event:</Text>
+            <Text style={styles.detailValue}>{(registration as any).eventTitle || 'Event'}</Text>
+          </View>
+
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Date:</Text>
+            <Text style={styles.detailValue}>
+              {new Date(registration.createdAt).toLocaleDateString()}
+            </Text>
+          </View>
+
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Status:</Text>
+            <Badge
+              value={registrationService.formatRegistrationStatus(registration.status)}
+              badgeStyle={[
+                styles.statusBadge,
+                { backgroundColor: registrationService.getStatusColor(registration.status) }
+              ]}
+            />
+          </View>
+
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Total Amount:</Text>
+            <Text style={styles.detailValue}>
+              ${registration.finalAmount.toFixed(2)}
+            </Text>
+          </View>
+
+          {registration.discountAmount && registration.discountAmount > 0 && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Discount Applied:</Text>
+              <Text style={styles.discountValue}>
+                -${registration.discountAmount!.toFixed(2)}
               </Text>
-              <Badge colorScheme="green" fontSize="md" px={4} py={2} borderRadius="full">
-                已付款完成
-              </Badge>
-            </VStack>
-          </CardBody>
-        </Card>
+            </View>
+          )}
+        </View>
 
-        <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={8}>
-          {/* Event & Registration Details */}
-          <Card bg={bgColor} borderWidth={1} borderColor={borderColor}>
-            <CardBody>
-              <VStack spacing={4} align="stretch">
-                <Heading as="h2" size="md" color="gray.700">
-                  活動資訊
-                </Heading>
-                
-                <Box p={4} bg={cardBgColor} borderRadius="md">
-                  <VStack spacing={3} align="stretch">
-                    <HStack justify="space-between">
-                      <Text fontSize="sm" color="gray.600">活動名稱：</Text>
-                      <Text fontSize="sm" fontWeight="medium" textAlign="right">
-                        {registration.event?.title || '載入中...'}
-                      </Text>
-                    </HStack>
-                    
-                    <HStack justify="space-between">
-                      <Text fontSize="sm" color="gray.600">活動日期：</Text>
-                      <Text fontSize="sm" fontWeight="medium">
-                        {registration.event?.startDate 
-                          ? new Date(registration.event.startDate).toLocaleDateString('zh-TW')
-                          : '載入中...'
-                        }
-                      </Text>
-                    </HStack>
-                    
-                    <HStack justify="space-between">
-                      <Text fontSize="sm" color="gray.600">活動地點：</Text>
-                      <Text fontSize="sm" fontWeight="medium" textAlign="right">
-                        {registration.event?.location || '載入中...'}
-                      </Text>
-                    </HStack>
-                    
-                    <Divider />
-                    
-                    <HStack justify="space-between">
-                      <Text fontSize="sm" color="gray.600">報名編號：</Text>
-                      <Text fontSize="sm" fontWeight="medium" fontFamily="mono">
-                        {registration.id.substring(0, 8).toUpperCase()}
-                      </Text>
-                    </HStack>
-                    
-                    <HStack justify="space-between">
-                      <Text fontSize="sm" color="gray.600">報名狀態：</Text>
-                      <Badge colorScheme="green" size="sm">
-                        已完成
-                      </Badge>
-                    </HStack>
-                  </VStack>
-                </Box>
+        <Divider style={styles.divider} />
 
-                {/* Ticket Information */}
-                <Heading as="h3" size="sm" color="gray.700" mt={4}>
-                  票券資訊
-                </Heading>
-                
-                <Box p={4} bg={cardBgColor} borderRadius="md">
-                  <VStack spacing={2} align="stretch">
-                    {formatTicketSelections(registration.ticketSelections || [])}
-                    
-                    <Divider />
-                    
-                    <HStack justify="space-between">
-                      <Text fontSize="sm" color="gray.600">原價：</Text>
-                      <Text fontSize="sm">NT$ {registration.totalAmount.toLocaleString()}</Text>
-                    </HStack>
-                    
-                    {registration.discountAmount && registration.discountAmount > 0 && (
-                      <HStack justify="space-between">
-                        <Text fontSize="sm" color="gray.600">折扣：</Text>
-                        <Text fontSize="sm" color="red.500">
-                          -NT$ {registration.discountAmount.toLocaleString()}
-                        </Text>
-                      </HStack>
-                    )}
-                    
-                    <HStack justify="space-between">
-                      <Text fontWeight="bold">實付金額：</Text>
-                      <Text fontWeight="bold" color="green.600">
-                        NT$ {registration.finalAmount.toLocaleString()}
-                      </Text>
-                    </HStack>
-                  </VStack>
-                </Box>
-              </VStack>
-            </CardBody>
-          </Card>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Ticket Details</Text>
+          
+          {registration.ticketSelections.map((selection, index) => (
+            <Card key={index} containerStyle={styles.ticketCard}>
+              <View style={styles.ticketRow}>
+                <View style={styles.ticketInfo}>
+                  <Text style={styles.ticketName}>Ticket Type {selection.ticketTypeId}</Text>
+                  <Text style={styles.ticketQuantity}>
+                    Quantity: {selection.quantity}
+                  </Text>
+                </View>
+                <Text style={styles.ticketPrice}>
+                  ${(selection.price * selection.quantity).toFixed(2)}
+                </Text>
+              </View>
+            </Card>
+          ))}
+        </View>
 
-          {/* QR Code & Actions */}
-          <Card bg={bgColor} borderWidth={1} borderColor={borderColor}>
-            <CardBody>
-              <VStack spacing={4} align="stretch">
-                <Heading as="h2" size="md" color="gray.700">
-                  電子票券
-                </Heading>
-                
-                {registration.qrCode ? (
-                  <VStack spacing={4}>
-                    <Box p={4} bg="white" borderRadius="md" borderWidth={1}>
-                      <Image
-                        src={registration.qrCode}
-                        alt="活動入場 QR Code"
-                        maxW="200px"
-                        mx="auto"
-                      />
-                    </Box>
-                    
-                    <Text fontSize="sm" color="gray.600" textAlign="center">
-                      請出示此 QR Code 作為入場憑證
-                    </Text>
-                    
-                    <Button
-                      leftIcon={<DownloadIcon />}
-                      colorScheme="blue"
-                      variant="outline"
-                      onClick={handleDownloadQR}
-                      w="full"
-                    >
-                      下載 QR Code
-                    </Button>
-                  </VStack>
-                ) : (
-                  <Box p={8} textAlign="center">
-                    <Text color="gray.500">QR Code 生成中...</Text>
-                  </Box>
-                )}
+        <Divider style={styles.divider} />
 
-                <Divider />
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Attendee Information</Text>
+          
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Name:</Text>
+            <Text style={styles.detailValue}>{(registration as any).userName || 'User'}</Text>
+          </View>
 
-                {/* Action Buttons */}
-                <VStack spacing={3}>
-                  <Button
-                    leftIcon={<ViewIcon />}
-                    colorScheme="green"
-                    size="lg"
-                    onClick={handleViewMyTickets}
-                    w="full"
-                  >
-                    查看我的票券
-                  </Button>
-                  
-                  <Button
-                    leftIcon={<ExternalLinkIcon />}
-                    variant="outline"
-                    onClick={handleBackToEvent}
-                    w="full"
-                  >
-                    回到活動頁面
-                  </Button>
-                </VStack>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Email:</Text>
+            <Text style={styles.detailValue}>{(registration as any).userEmail || 'Email not available'}</Text>
+          </View>
 
-                {/* Important Notes */}
-                <Alert status="info" size="sm">
-                  <AlertIcon />
-                  <Box fontSize="sm">
-                    <Text fontWeight="bold">重要提醒：</Text>
-                    <Text>
-                      1. 請妥善保存此 QR Code<br/>
-                      2. 活動當天請出示 QR Code 入場<br/>
-                      3. 確認郵件已發送至您的信箱
-                    </Text>
-                  </Box>
-                </Alert>
-              </VStack>
-            </CardBody>
-          </Card>
-        </SimpleGrid>
-      </VStack>
-    </Container>
+          {(registration as any).userPhone && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Phone:</Text>
+              <Text style={styles.detailValue}>{(registration as any).userPhone}</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.infoBox}>
+          <Icon name="info" type="material" color="#3182CE" size={20} />
+          <Text style={styles.infoText}>
+            A confirmation email has been sent to {(registration as any).userEmail || 'your email'} with your ticket details and QR code.
+          </Text>
+        </View>
+
+        <View style={styles.buttonContainer}>
+          <Button
+            title="View My Tickets"
+            onPress={handleViewTickets}
+            buttonStyle={styles.primaryButton}
+            icon={
+              <Icon
+                name="confirmation-number"
+                type="material"
+                color="white"
+                size={20}
+                style={{ marginRight: 8 }}
+              />
+            }
+          />
+
+          <Button
+            title="Contact Support"
+            type="outline"
+            onPress={handleContactSupport}
+            buttonStyle={styles.outlineButton}
+            titleStyle={styles.outlineButtonText}
+          />
+        </View>
+      </Card>
+    </ScrollView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F7FAFC',
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  card: {
+    margin: 16,
+    borderRadius: 8,
+    padding: 0,
+  },
+  successHeader: {
+    alignItems: 'center',
+    padding: 24,
+  },
+  successTitle: {
+    marginTop: 16,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#2D3748',
+  },
+  successSubtitle: {
+    marginTop: 8,
+    fontSize: 16,
+    color: '#718096',
+    textAlign: 'center',
+  },
+  divider: {
+    marginVertical: 20,
+  },
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2D3748',
+    marginBottom: 16,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: '#718096',
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2D3748',
+  },
+  discountValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#48BB78',
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  ticketCard: {
+    marginBottom: 12,
+    borderRadius: 6,
+    padding: 12,
+  },
+  ticketRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  ticketInfo: {
+    flex: 1,
+  },
+  ticketName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2D3748',
+  },
+  ticketQuantity: {
+    fontSize: 14,
+    color: '#718096',
+    marginTop: 4,
+  },
+  ticketPrice: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2D3748',
+  },
+  infoBox: {
+    flexDirection: 'row',
+    backgroundColor: '#EBF8FF',
+    padding: 16,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 6,
+    alignItems: 'flex-start',
+  },
+  infoText: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: 14,
+    color: '#2C5282',
+    lineHeight: 20,
+  },
+  buttonContainer: {
+    padding: 20,
+    gap: 12,
+  },
+  primaryButton: {
+    backgroundColor: '#3182CE',
+    paddingVertical: 12,
+    borderRadius: 6,
+  },
+  outlineButton: {
+    borderColor: '#3182CE',
+    paddingVertical: 12,
+    borderRadius: 6,
+  },
+  outlineButtonText: {
+    color: '#3182CE',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#718096',
+  },
+  errorText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#E53E3E',
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 20,
+    backgroundColor: '#3182CE',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 6,
+  },
+});
 
 export default RegistrationConfirmationPage;

@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import apiClient from './apiClient';
 
 export interface CheckInRequest {
   qrCode: string;
@@ -42,17 +42,17 @@ export class CheckInService {
         { qrCode }
       );
 
-      if (response.data.success) {
+      if (response.success) {
         return {
           success: true,
-          data: response.data
+          data: response
         };
       }
 
       return {
         success: false,
-        error: response.data.error || 'Check-in failed',
-        errorCode: response.data.errorCode
+        error: response.error || 'Check-in failed',
+        errorCode: response.errorCode
       };
     } catch (error: any) {
       // Handle specific error cases
@@ -85,6 +85,13 @@ export class CheckInService {
         error: `Check-in failed: ${error.message || 'Unknown error'}`
       };
     }
+  }
+
+  /**
+   * Check in by QR code (alias for checkInAttendee)
+   */
+  async checkInByQRCode(eventId: string, qrCode: string): Promise<CheckInServiceResult<CheckInResponse>> {
+    return this.checkInAttendee(eventId, qrCode);
   }
 
   /**

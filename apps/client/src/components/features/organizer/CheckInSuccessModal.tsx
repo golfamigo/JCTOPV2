@@ -1,20 +1,8 @@
 import React from 'react';
-import {
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Button,
-  VStack,
-  HStack,
-  Text,
-  Icon,
-  Box,
-  useColorModeValue,
-} from '@chakra-ui/react';
-import { CheckCircleIcon } from '@chakra-ui/icons';
+import { View, StyleSheet } from 'react-native';
+import { Overlay, Button, Text, Icon } from '@rneui/themed';
+import { Ionicons } from '@expo/vector-icons';
+import { useAppTheme } from '../../../theme';
 
 interface CheckInSuccessModalProps {
   isOpen: boolean;
@@ -31,93 +19,142 @@ export const CheckInSuccessModal: React.FC<CheckInSuccessModalProps> = ({
   onClose,
   attendee,
 }) => {
-  const bgColor = useColorModeValue('white', 'neutral.800');
-  const borderColor = useColorModeValue('success.200', 'success.700');
-  const successBg = useColorModeValue('success.50', 'success.900');
-  const successColor = useColorModeValue('success.600', 'success.300');
+  const { colors } = useAppTheme();
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      isCentered
-      motionPreset="slideInBottom"
-      size="md"
+    <Overlay
+      isVisible={isOpen}
+      onBackdropPress={onClose}
+      overlayStyle={[styles.overlay, { backgroundColor: colors.card }]}
     >
-      <ModalOverlay />
-      <ModalContent bg={bgColor} borderRadius="16px">
-        <ModalHeader textAlign="center" pt={8}>
-          <VStack spacing={4}>
-            <Box
-              p={4}
-              borderRadius="full"
-              bg={successBg}
-              color={successColor}
-            >
-              <Icon as={CheckCircleIcon} boxSize={12} />
-            </Box>
-            <Text fontSize="2xl" fontWeight="bold" color={successColor}>
-              Check-in Successful!
+      <View style={styles.container}>
+        {/* Success Icon and Title */}
+        <View style={styles.header}>
+          <View style={[styles.iconContainer, { backgroundColor: colors.success + '20' }]}>
+            <Icon
+              name="checkmark-circle"
+              type="ionicon"
+              color={colors.success}
+              size={48}
+            />
+          </View>
+          <Text h3 style={[styles.title, { color: colors.success }]}>
+            Check-in Successful!
+          </Text>
+        </View>
+
+        {/* Attendee Information */}
+        <View style={[styles.infoCard, { 
+          backgroundColor: colors.success + '10',
+          borderColor: colors.success + '40'
+        }]}>
+          <View style={styles.infoRow}>
+            <Text style={[styles.label, { color: colors.grey2 }]}>
+              ATTENDEE NAME
             </Text>
-          </VStack>
-        </ModalHeader>
-
-        <ModalBody pb={6}>
-          <VStack
-            spacing={4}
-            p={6}
-            borderRadius="12px"
-            border="2px solid"
-            borderColor={borderColor}
-            bg={useColorModeValue('success.50', 'success.900')}
-          >
-            <VStack spacing={2} width="100%">
-              <Text fontSize="sm" color="neutral.600" fontWeight="medium">
-                ATTENDEE NAME
-              </Text>
-              <Text fontSize="xl" fontWeight="bold">
-                {attendee.name}
-              </Text>
-            </VStack>
-
-            <VStack spacing={2} width="100%">
-              <Text fontSize="sm" color="neutral.600" fontWeight="medium">
-                EMAIL
-              </Text>
-              <Text fontSize="md">
-                {attendee.email}
-              </Text>
-            </VStack>
-
-            <VStack spacing={2} width="100%">
-              <Text fontSize="sm" color="neutral.600" fontWeight="medium">
-                TICKET TYPE
-              </Text>
-              <Text fontSize="md" fontWeight="semibold">
-                {attendee.ticketType}
-              </Text>
-            </VStack>
-          </VStack>
-
-          <Box mt={4} textAlign="center">
-            <Text fontSize="sm" color="neutral.600">
-              Check-in time: {new Date().toLocaleTimeString()}
+            <Text h4 style={[styles.value, { color: colors.text }]}>
+              {attendee.name}
             </Text>
-          </Box>
-        </ModalBody>
+          </View>
 
-        <ModalFooter>
-          <Button
-            colorScheme="success"
-            width="100%"
-            size="lg"
-            onClick={onClose}
-            borderRadius="8px"
-          >
-            Continue Scanning
-          </Button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
+          <View style={styles.infoRow}>
+            <Text style={[styles.label, { color: colors.grey2 }]}>
+              EMAIL
+            </Text>
+            <Text style={[styles.value, { color: colors.text }]}>
+              {attendee.email}
+            </Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Text style={[styles.label, { color: colors.grey2 }]}>
+              TICKET TYPE
+            </Text>
+            <Text style={[styles.value, styles.semibold, { color: colors.text }]}>
+              {attendee.ticketType}
+            </Text>
+          </View>
+        </View>
+
+        {/* Check-in Time */}
+        <View style={styles.footer}>
+          <Text style={[styles.timestamp, { color: colors.grey2 }]}>
+            Check-in time: {new Date().toLocaleTimeString()}
+          </Text>
+        </View>
+
+        {/* Continue Button */}
+        <Button
+          title="Continue Scanning"
+          onPress={onClose}
+          buttonStyle={[styles.button, { backgroundColor: colors.success }]}
+          titleStyle={styles.buttonTitle}
+        />
+      </View>
+    </Overlay>
   );
 };
+
+const styles = StyleSheet.create({
+  overlay: {
+    borderRadius: 16,
+    padding: 0,
+    width: '90%',
+    maxWidth: 400,
+  },
+  container: {
+    padding: 24,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  iconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  title: {
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  infoCard: {
+    borderRadius: 12,
+    borderWidth: 2,
+    padding: 20,
+    marginBottom: 16,
+  },
+  infoRow: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  value: {
+    fontSize: 16,
+  },
+  semibold: {
+    fontWeight: '600',
+  },
+  footer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  timestamp: {
+    fontSize: 14,
+  },
+  button: {
+    borderRadius: 8,
+    paddingVertical: 12,
+  },
+  buttonTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});

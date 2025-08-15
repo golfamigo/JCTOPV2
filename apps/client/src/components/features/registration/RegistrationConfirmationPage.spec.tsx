@@ -16,10 +16,7 @@ jest.mock('../../../services/registrationService', () => ({
 
 // Mock Chakra UI toast
 const mockToast = jest.fn();
-jest.mock('@chakra-ui/react', () => ({
-  ...jest.requireActual('@chakra-ui/react'),
-  useToast: () => mockToast,
-}));
+// Removed ChakraUI mock
 
 const mockRouter = {
   push: jest.fn(),

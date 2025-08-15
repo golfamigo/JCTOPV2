@@ -1,6 +1,5 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { ChakraProvider } from '@chakra-ui/react';
 import { ReportVisualization } from './ReportVisualization';
 import { EventReport } from '@jctop-event/shared-types';
 

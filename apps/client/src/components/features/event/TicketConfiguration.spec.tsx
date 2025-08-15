@@ -1,15 +1,10 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ChakraProvider } from '@chakra-ui/react';
 import { TicketType } from '@jctop-event/shared-types';
 import TicketConfiguration from './TicketConfiguration';
 
-// Mock useToast
+// Mock useToast (removed since we're not using ChakraUI anymore)
 const mockToast = jest.fn();
-jest.mock('@chakra-ui/react', () => ({
-  ...jest.requireActual('@chakra-ui/react'),
-  useToast: () => mockToast,
-}));
 
 const mockTicketTypes: TicketType[] = [
   {

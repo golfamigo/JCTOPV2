@@ -1,15 +1,10 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ChakraProvider } from '@chakra-ui/react';
 import { SeatingZone } from '@jctop-event/shared-types';
 import SeatingConfiguration from './SeatingConfiguration';
 
-// Mock useToast
+// Mock useToast (removed since we're not using ChakraUI anymore)
 const mockToast = jest.fn();
-jest.mock('@chakra-ui/react', () => ({
-  ...jest.requireActual('@chakra-ui/react'),
-  useToast: () => mockToast,
-}));
 
 const mockSeatingZones: SeatingZone[] = [
   {

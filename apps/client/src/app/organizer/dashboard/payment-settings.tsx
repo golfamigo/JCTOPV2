@@ -1,52 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  VStack,
-  HStack,
+  View,
+  ScrollView,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+} from 'react-native';
+import {
   Button,
   Text,
-  Heading,
-  Alert,
-  AlertIcon,
-  AlertDescription,
-  useColorModeValue,
-  Container,
   Card,
-  CardBody,
-  CardHeader,
-  useToast,
-  Divider,
-  SimpleGrid,
   Badge,
   Icon,
-  IconButton,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
-  useDisclosure,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalCloseButton,
-  ModalBody,
-  Center,
-  Spinner,
-  Flex,
-} from '@chakra-ui/react';
-import { 
-  AddIcon, 
-  SettingsIcon, 
-  DeleteIcon, 
-  CheckIcon, 
-  InfoIcon,
-  ChevronDownIcon 
-} from '@chakra-ui/icons';
-import { FaCreditCard, FaApplePay, FaGooglePay } from 'react-icons/fa';
+  Header,
+  Divider,
+  ListItem,
+  Overlay,
+} from '@rneui/themed';
+import { MaterialIcons } from '@expo/vector-icons';
 import { PaymentProvider } from '@jctop-event/shared-types';
 import paymentService from '../../../services/paymentService';
 import PaymentProviderCredentialsForm from '../../../components/features/organizer/PaymentProviderCredentialsForm';
+import { useAppTheme } from '@/theme';
+import { useNavigation } from '@react-navigation/native';
 
 const PaymentSettingsPage: React.FC = () => {
   const [providers, setProviders] = useState<PaymentProvider[]>([]);
@@ -55,11 +32,11 @@ const PaymentSettingsPage: React.FC = () => {
   const [selectedProvider, setSelectedProvider] = useState<PaymentProvider | null>(null);
   const [selectedProviderId, setSelectedProviderId] = useState<string>('');
   const [actionType, setActionType] = useState<'create' | 'edit'>('create');
-
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const toast = useToast();
-  const bgColor = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  
+  const { colors, spacing } = useAppTheme();
+  const navigation = useNavigation();
 
   useEffect(() => {
     loadPaymentProviders();
@@ -68,374 +45,492 @@ const PaymentSettingsPage: React.FC = () => {
   const loadPaymentProviders = async () => {
     try {
       setIsLoading(true);
-      const providerList = await paymentService.getPaymentProviders();
-      setProviders(providerList);
       setError(null);
-    } catch (err: any) {
-      console.error('Error loading payment providers:', err);
-      setError(err.message || '無法載入付款方式設定');
+      const data = await paymentService.getPaymentProviders();
+      setProviders(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load payment providers');
+      Alert.alert('Error', 'Failed to load payment providers');
     } finally {
       setIsLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const handleAddProvider = (providerId: string) => {
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadPaymentProviders();
+  };
+
+  const handleToggleProvider = async (providerId: string, isActive: boolean) => {
+    try {
+      if (isActive) {
+        await paymentService.deactivateProvider(providerId);
+      } else {
+        await paymentService.activateProvider(providerId);
+      }
+      await loadPaymentProviders();
+      Alert.alert('Success', `Provider ${isActive ? 'deactivated' : 'activated'} successfully`);
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to update provider');
+    }
+  };
+
+  const handleCreateProvider = () => {
     setSelectedProvider(null);
-    setSelectedProviderId(providerId);
+    setSelectedProviderId('');
     setActionType('create');
-    onOpen();
+    setShowCredentialsModal(true);
   };
 
   const handleEditProvider = (provider: PaymentProvider) => {
     setSelectedProvider(provider);
-    setSelectedProviderId(provider.providerId);
+    setSelectedProviderId(provider.id);
     setActionType('edit');
-    onOpen();
+    setShowCredentialsModal(true);
   };
 
-  const handleSetDefault = async (providerId: string) => {
+  const handleDeleteProvider = (providerId: string) => {
+    Alert.alert(
+      'Delete Provider',
+      'Are you sure you want to delete this payment provider?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await paymentService.deleteProvider(providerId);
+              await loadPaymentProviders();
+              Alert.alert('Success', 'Provider deleted successfully');
+            } catch (err) {
+              Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete provider');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSaveCredentials = async (credentials: any) => {
     try {
-      await paymentService.setDefaultPaymentProvider(providerId);
-      toast({
-        title: '設定已更新',
-        description: '預設付款方式已更改',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
+      if (actionType === 'create') {
+        await paymentService.createProvider(credentials);
+      } else {
+        await paymentService.updateProviderCredentials(selectedProviderId, credentials);
+      }
+      
+      setShowCredentialsModal(false);
       await loadPaymentProviders();
-    } catch (err: any) {
-      toast({
-        title: '設定失敗',
-        description: err.message || '無法更改預設付款方式',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+      Alert.alert('Success', `Provider ${actionType === 'create' ? 'created' : 'updated'} successfully`);
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : `Failed to ${actionType} provider`);
     }
   };
 
-  const handleRemoveProvider = async (providerId: string) => {
-    if (!confirm('確定要移除此付款方式嗎？這將會停用相關的付款功能。')) {
-      return;
-    }
-
-    try {
-      await paymentService.removePaymentProvider(providerId);
-      toast({
-        title: '付款方式已移除',
-        description: '付款方式設定已成功移除',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-      await loadPaymentProviders();
-    } catch (err: any) {
-      toast({
-        title: '移除失敗',
-        description: err.message || '無法移除付款方式',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    }
-  };
-
-  const handleSaveProvider = async (provider: PaymentProvider) => {
-    onClose();
-    toast({
-      title: actionType === 'create' ? '付款方式已新增' : '設定已更新',
-      description: '付款方式設定已成功儲存',
-      status: 'success',
-      duration: 3000,
-      isClosable: true,
-    });
-    await loadPaymentProviders();
-  };
-
-  const getProviderIcon = (providerId: string) => {
-    switch (providerId) {
+  const getProviderIcon = (type: string) => {
+    switch (type.toLowerCase()) {
       case 'ecpay':
-        return FaCreditCard;
-      case 'stripe':
-        return FaCreditCard;
+        return 'credit-card';
+      case 'apple_pay':
+        return 'phone-iphone';
+      case 'google_pay':
+        return 'android';
+      case 'line_pay':
+        return 'message';
       case 'paypal':
-        return FaCreditCard;
-      case 'applepay':
-        return FaApplePay;
-      case 'googlepay':
-        return FaGooglePay;
+        return 'payment';
       default:
-        return FaCreditCard;
+        return 'payment';
     }
   };
 
-  const getProviderName = (providerId: string): string => {
-    switch (providerId) {
-      case 'ecpay':
-        return 'ECPay 綠界科技';
-      case 'stripe':
-        return 'Stripe';
-      case 'paypal':
-        return 'PayPal';
-      case 'applepay':
-        return 'Apple Pay';
-      case 'googlepay':
-        return 'Google Pay';
-      default:
-        return providerId;
-    }
+  const getProviderStatusColor = (isActive: boolean, isConfigured: boolean) => {
+    if (!isConfigured) return colors.warning;
+    return isActive ? colors.success : colors.grey3;
   };
 
-  const getProviderColor = (providerId: string): string => {
-    switch (providerId) {
-      case 'ecpay':
-        return 'green';
-      case 'stripe':
-        return 'purple';
-      case 'paypal':
-        return 'blue';
-      case 'applepay':
-        return 'gray';
-      case 'googlepay':
-        return 'red';
-      default:
-        return 'gray';
-    }
-  };
+  const renderProvider = (provider: PaymentProvider) => (
+    <Card key={provider.id} containerStyle={styles.providerCard}>
+      <View style={styles.providerHeader}>
+        <View style={styles.providerInfo}>
+          <Icon
+            name={getProviderIcon(provider.type)}
+            type="material"
+            size={32}
+            color={colors.primary}
+          />
+          <View style={styles.providerDetails}>
+            <Text h4>{provider.name}</Text>
+            <Text style={styles.providerType}>{provider.type.toUpperCase()}</Text>
+          </View>
+        </View>
+        <Badge
+          value={provider.isActive ? 'Active' : provider.isConfigured ? 'Inactive' : 'Not Configured'}
+          badgeStyle={[
+            styles.statusBadge,
+            { backgroundColor: getProviderStatusColor(provider.isActive, provider.isConfigured) }
+          ]}
+        />
+      </View>
 
-  const availableProviders = [
-    { id: 'ecpay', name: 'ECPay 綠界科技', description: '台灣主要的第三方支付服務' },
-    // Future providers can be added here
-    // { id: 'stripe', name: 'Stripe', description: '國際信用卡支付服務' },
-    // { id: 'paypal', name: 'PayPal', description: 'PayPal 數位錢包支付' },
-  ];
+      <Divider style={styles.divider} />
 
-  const getAvailableProviders = () => {
-    const configuredProviderIds = providers.map(p => p.providerId);
-    return availableProviders.filter(p => !configuredProviderIds.includes(p.id));
-  };
+      <View style={styles.providerContent}>
+        {provider.description && (
+          <Text style={styles.description}>{provider.description}</Text>
+        )}
+        
+        <View style={styles.configInfo}>
+          <Text style={styles.configLabel}>Configuration Status:</Text>
+          <Text style={[styles.configValue, { color: provider.isConfigured ? colors.success : colors.warning }]}>
+            {provider.isConfigured ? '✓ Configured' : '⚠ Not Configured'}
+          </Text>
+        </View>
 
-  if (isLoading) {
+        {provider.isConfigured && provider.merchantId && (
+          <View style={styles.configInfo}>
+            <Text style={styles.configLabel}>Merchant ID:</Text>
+            <Text style={styles.configValue}>{provider.merchantId}</Text>
+          </View>
+        )}
+
+        {provider.supportedCurrencies && provider.supportedCurrencies.length > 0 && (
+          <View style={styles.configInfo}>
+            <Text style={styles.configLabel}>Supported Currencies:</Text>
+            <View style={styles.currencyList}>
+              {provider.supportedCurrencies.map((currency) => (
+                <Badge
+                  key={currency}
+                  value={currency}
+                  badgeStyle={styles.currencyBadge}
+                  textStyle={styles.currencyText}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+      </View>
+
+      <Divider style={styles.divider} />
+
+      <View style={styles.providerActions}>
+        <Button
+          title={provider.isActive ? 'Deactivate' : 'Activate'}
+          type={provider.isActive ? 'outline' : 'solid'}
+          buttonStyle={[
+            styles.actionButton,
+            provider.isActive && { borderColor: colors.error }
+          ]}
+          titleStyle={provider.isActive && { color: colors.error }}
+          onPress={() => handleToggleProvider(provider.id, provider.isActive)}
+          disabled={!provider.isConfigured}
+        />
+        <Button
+          title="Configure"
+          type="outline"
+          buttonStyle={styles.actionButton}
+          onPress={() => handleEditProvider(provider)}
+        />
+        <Button
+          title="Delete"
+          type="clear"
+          titleStyle={{ color: colors.error }}
+          onPress={() => handleDeleteProvider(provider.id)}
+        />
+      </View>
+    </Card>
+  );
+
+  if (isLoading && !refreshing) {
     return (
-      <Container maxW="6xl" py={8}>
-        <Center>
-          <VStack spacing={4}>
-            <Spinner size="xl" color="blue.500" />
-            <Text>載入付款設定中...</Text>
-          </VStack>
-        </Center>
-      </Container>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Header
+          leftComponent={
+            <Icon
+              name="arrow-back"
+              type="material"
+              color={colors.white}
+              onPress={() => navigation.goBack()}
+            />
+          }
+          centerComponent={{ text: 'Payment Settings', style: { color: colors.white } }}
+          backgroundColor={colors.primary}
+        />
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading payment providers...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (error && !refreshing) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Header
+          leftComponent={
+            <Icon
+              name="arrow-back"
+              type="material"
+              color={colors.white}
+              onPress={() => navigation.goBack()}
+            />
+          }
+          centerComponent={{ text: 'Payment Settings', style: { color: colors.white } }}
+          backgroundColor={colors.primary}
+        />
+        <View style={styles.centerContent}>
+          <Icon name="error-outline" type="material" color={colors.error} size={48} />
+          <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+          <Button
+            title="Retry"
+            onPress={loadPaymentProviders}
+            buttonStyle={[styles.retryButton, { backgroundColor: colors.primary }]}
+          />
+        </View>
+      </View>
     );
   }
 
   return (
-    <Container maxW="6xl" py={8}>
-      <VStack spacing={8} align="stretch">
-        {/* Header */}
-        <Box>
-          <Heading as="h1" size="xl" mb={2}>
-            付款方式設定
-          </Heading>
-          <Text color="gray.600">
-            管理您的付款方式，設定不同的支付服務提供商
-          </Text>
-        </Box>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Header
+        leftComponent={
+          <Icon
+            name="arrow-back"
+            type="material"
+            color={colors.white}
+            onPress={() => navigation.goBack()}
+          />
+        }
+        centerComponent={{ text: 'Payment Settings', style: { color: colors.white } }}
+        rightComponent={
+          <Icon
+            name="add"
+            type="material"
+            color={colors.white}
+            onPress={handleCreateProvider}
+          />
+        }
+        backgroundColor={colors.primary}
+      />
 
-        {/* Error Alert */}
-        {error && (
-          <Alert status="error">
-            <AlertIcon />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primary]}
+          />
+        }
+      >
+        {/* Info Alert */}
+        <Card containerStyle={styles.infoCard}>
+          <View style={styles.infoContent}>
+            <Icon name="info-outline" type="material" color={colors.primary} size={24} />
+            <Text style={styles.infoText}>
+              Configure payment providers to accept payments for your events. 
+              You can enable multiple providers to give attendees more payment options.
+            </Text>
+          </View>
+        </Card>
 
-        {/* Add Provider Section */}
-        {getAvailableProviders().length > 0 && (
-          <Card bg={bgColor} borderWidth={1} borderColor={borderColor}>
-            <CardHeader>
-              <HStack justify="space-between">
-                <Heading as="h2" size="md">
-                  新增付款方式
-                </Heading>
-              </HStack>
-            </CardHeader>
-            <CardBody>
-              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
-                {getAvailableProviders().map((provider) => (
-                  <Card
-                    key={provider.id}
-                    variant="outline"
-                    _hover={{ borderColor: 'blue.300', bg: 'blue.50' }}
-                    cursor="pointer"
-                    onClick={() => handleAddProvider(provider.id)}
-                  >
-                    <CardBody>
-                      <VStack spacing={3}>
-                        <Icon 
-                          as={getProviderIcon(provider.id)} 
-                          boxSize={10} 
-                          color={`${getProviderColor(provider.id)}.500`} 
-                        />
-                        <VStack spacing={1} textAlign="center">
-                          <Text fontWeight="bold">{provider.name}</Text>
-                          <Text fontSize="sm" color="gray.600">
-                            {provider.description}
-                          </Text>
-                        </VStack>
-                        <Button size="sm" colorScheme="blue" leftIcon={<AddIcon />}>
-                          新增
-                        </Button>
-                      </VStack>
-                    </CardBody>
-                  </Card>
-                ))}
-              </SimpleGrid>
-            </CardBody>
+        {/* Provider List */}
+        {providers.length > 0 ? (
+          providers.map(renderProvider)
+        ) : (
+          <Card containerStyle={styles.emptyCard}>
+            <View style={styles.emptyContent}>
+              <Icon name="payment" type="material" color={colors.grey3} size={64} />
+              <Text style={styles.emptyText}>No payment providers configured</Text>
+              <Button
+                title="Add Payment Provider"
+                onPress={handleCreateProvider}
+                buttonStyle={[styles.addButton, { backgroundColor: colors.primary }]}
+              />
+            </View>
           </Card>
         )}
 
-        {/* Configured Providers */}
-        <Card bg={bgColor} borderWidth={1} borderColor={borderColor}>
-          <CardHeader>
-            <HStack justify="space-between">
-              <Heading as="h2" size="md">
-                已設定的付款方式
-              </Heading>
-              <Badge colorScheme="blue">
-                {providers.length} 個付款方式
-              </Badge>
-            </HStack>
-          </CardHeader>
-          <CardBody>
-            {providers.length === 0 ? (
-              <Center py={8}>
-                <VStack spacing={4}>
-                  <Icon as={InfoIcon} boxSize={12} color="gray.400" />
-                  <Text color="gray.500" textAlign="center">
-                    尚未設定任何付款方式<br />
-                    請先新增付款方式以開始收款
-                  </Text>
-                </VStack>
-              </Center>
-            ) : (
-              <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={4}>
-                {providers.map((provider) => (
-                  <Card key={provider.id} variant="outline">
-                    <CardBody>
-                      <Flex justify="space-between" align="start">
-                        <HStack spacing={4} flex={1}>
-                          <Icon 
-                            as={getProviderIcon(provider.providerId)} 
-                            boxSize={8} 
-                            color={`${getProviderColor(provider.providerId)}.500`} 
-                          />
-                          <VStack spacing={1} align="start" flex={1}>
-                            <HStack>
-                              <Text fontWeight="bold">
-                                {getProviderName(provider.providerId)}
-                              </Text>
-                              {provider.isDefault && (
-                                <Badge colorScheme="green" size="sm">
-                                  預設
-                                </Badge>
-                              )}
-                              {!provider.isActive && (
-                                <Badge colorScheme="gray" size="sm">
-                                  已停用
-                                </Badge>
-                              )}
-                            </HStack>
-                            <Text fontSize="sm" color="gray.600">
-                              設定時間：{new Date(provider.createdAt).toLocaleDateString('zh-TW')}
-                            </Text>
-                            <Text fontSize="sm" color="gray.600">
-                              更新時間：{new Date(provider.updatedAt).toLocaleDateString('zh-TW')}
-                            </Text>
-                          </VStack>
-                        </HStack>
+        <View style={{ height: spacing.xl }} />
+      </ScrollView>
 
-                        <Menu>
-                          <MenuButton
-                            as={IconButton}
-                            icon={<ChevronDownIcon />}
-                            variant="ghost"
-                            size="sm"
-                          />
-                          <MenuList>
-                            <MenuItem
-                              icon={<SettingsIcon />}
-                              onClick={() => handleEditProvider(provider)}
-                            >
-                              編輯設定
-                            </MenuItem>
-                            {!provider.isDefault && (
-                              <MenuItem
-                                icon={<CheckIcon />}
-                                onClick={() => handleSetDefault(provider.providerId)}
-                              >
-                                設為預設
-                              </MenuItem>
-                            )}
-                            <MenuItem
-                              icon={<DeleteIcon />}
-                              color="red.500"
-                              onClick={() => handleRemoveProvider(provider.providerId)}
-                            >
-                              移除
-                            </MenuItem>
-                          </MenuList>
-                        </Menu>
-                      </Flex>
-                    </CardBody>
-                  </Card>
-                ))}
-              </SimpleGrid>
-            )}
-          </CardBody>
-        </Card>
-
-        {/* Information Section */}
-        <Card bg="blue.50" borderWidth={1} borderColor="blue.200">
-          <CardBody>
-            <VStack spacing={3} align="start">
-              <HStack>
-                <Icon as={InfoIcon} color="blue.500" />
-                <Text fontWeight="bold" color="blue.700">
-                  付款方式說明
-                </Text>
-              </HStack>
-              <VStack spacing={2} align="start" fontSize="sm" color="blue.600">
-                <Text>• 每個付款方式需要設定對應的服務商憑證</Text>
-                <Text>• 設為預設的付款方式將優先用於新的付款</Text>
-                <Text>• 停用的付款方式不會出現在付款選項中</Text>
-                <Text>• 所有付款資料都會以加密方式安全儲存</Text>
-              </VStack>
-            </VStack>
-          </CardBody>
-        </Card>
-      </VStack>
-
-      {/* Provider Configuration Modal */}
-      <Modal isOpen={isOpen} onClose={onClose} size="xl">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>
-            {actionType === 'create' ? '新增付款方式' : '編輯付款方式'}
-          </ModalHeader>
-          <ModalCloseButton />
-          <ModalBody pb={6}>
+      {/* Credentials Modal */}
+      <Overlay
+        isVisible={showCredentialsModal}
+        onBackdropPress={() => setShowCredentialsModal(false)}
+        overlayStyle={styles.modalOverlay}
+      >
+        <View>
+          <Text h4 style={styles.modalTitle}>
+            {actionType === 'create' ? 'Add Payment Provider' : 'Update Provider Configuration'}
+          </Text>
+          <Divider style={styles.divider} />
+          
+          {showCredentialsModal && selectedProvider && (
             <PaymentProviderCredentialsForm
               provider={selectedProvider}
-              providerId={selectedProviderId}
-              onSave={handleSaveProvider}
-              onCancel={onClose}
+              providerId={selectedProvider.id}
+              onSave={handleSaveCredentials}
+              onCancel={() => setShowCredentialsModal(false)}
             />
-          </ModalBody>
-        </ModalContent>
-      </Modal>
-    </Container>
+          )}
+        </View>
+      </Overlay>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorText: {
+    marginTop: 10,
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 20,
+    paddingHorizontal: 30,
+  },
+  infoCard: {
+    margin: 15,
+    borderRadius: 8,
+    backgroundColor: '#E3F2FD',
+    borderColor: '#2196F3',
+    borderWidth: 1,
+  },
+  infoContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  infoText: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 14,
+    color: '#1976D2',
+    lineHeight: 20,
+  },
+  providerCard: {
+    margin: 15,
+    marginTop: 0,
+    borderRadius: 8,
+  },
+  providerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  providerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  providerDetails: {
+    marginLeft: 15,
+  },
+  providerType: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  statusBadge: {
+    borderRadius: 4,
+    paddingHorizontal: 8,
+  },
+  divider: {
+    marginVertical: 10,
+  },
+  providerContent: {
+    marginVertical: 10,
+  },
+  description: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 10,
+  },
+  configInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginVertical: 5,
+  },
+  configLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  configValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  currencyList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+  },
+  currencyBadge: {
+    backgroundColor: '#E0E0E0',
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    marginRight: 5,
+    marginTop: 5,
+  },
+  currencyText: {
+    fontSize: 12,
+    color: '#333',
+  },
+  providerActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  actionButton: {
+    borderRadius: 8,
+    paddingHorizontal: 20,
+  },
+  emptyCard: {
+    margin: 15,
+    borderRadius: 8,
+  },
+  emptyContent: {
+    alignItems: 'center',
+    padding: 30,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    marginVertical: 15,
+  },
+  addButton: {
+    borderRadius: 8,
+    paddingHorizontal: 30,
+  },
+  modalOverlay: {
+    width: '90%',
+    maxHeight: '80%',
+    borderRadius: 8,
+  },
+  modalTitle: {
+    marginBottom: 10,
+  },
+});
 
 export default PaymentSettingsPage;

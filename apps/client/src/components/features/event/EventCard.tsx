@@ -1,19 +1,10 @@
 import React from 'react';
-import {
-  Box,
-  Image,
-  Text,
-  Heading,
-  VStack,
-  HStack,
-  Badge,
-  Button,
-  IconButton,
-  useColorModeValue,
-  Skeleton,
-} from '@chakra-ui/react';
-import { StarIcon, CalendarIcon } from '@chakra-ui/icons';
+import { View, TouchableOpacity, Pressable } from 'react-native';
+import { Card, Text, Button, Icon, Badge } from '@rneui/themed';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { EventWithRelations } from '@jctop-event/shared-types';
+import { useAppTheme } from '@/theme';
 
 interface EventCardProps {
   event: EventWithRelations;
@@ -32,55 +23,45 @@ const EventCard: React.FC<EventCardProps> = ({
   onRegister,
   isLoading = false,
 }) => {
-  // Design system colors following branding guide
-  const cardBgColor = useColorModeValue('white', '#1E293B');
-  const borderColor = useColorModeValue('#E2E8F0', '#475569');
-  const primaryColor = '#2563EB';
-  const secondaryColor = '#475569';
-  const neutralDark = '#0F172A';
-  const neutralMedium = '#64748B';
-  const successColor = '#10B981';
+  const { t } = useTranslation();
+  const { colors, spacing } = useAppTheme();
 
   const formatDate = (date: Date | string) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
+    const dateObj = new Date(date);
+    const year = dateObj.getFullYear();
+    const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+    const day = dateObj.getDate().toString().padStart(2, '0');
+    return `${year}年${month}月${day}日`;
   };
 
   const formatTime = (date: Date | string) => {
-    return new Date(date).toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
+    const dateObj = new Date(date);
+    const hours = dateObj.getHours().toString().padStart(2, '0');
+    const minutes = dateObj.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
   };
 
   const getMinPrice = () => {
     if (!event.ticketTypes || event.ticketTypes.length === 0) {
-      return 'Free';
+      return t('events.free');
     }
     const minPrice = Math.min(...event.ticketTypes.map(ticket => ticket.price));
-    return minPrice === 0 ? 'Free' : `$${minPrice.toFixed(2)}`;
+    return minPrice === 0 ? t('events.free') : `NT$${minPrice.toFixed(0)}`;
   };
 
-  const handleCardClick = () => {
+  const handleViewDetailsPress = () => {
     if (onEventClick && !isLoading) {
       onEventClick(event.id);
     }
   };
 
-  const handleFavoriteClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card click
+  const handleFavoritePress = () => {
     if (onFavorite && !isLoading) {
       onFavorite(event.id, !isFavorited);
     }
   };
 
-  const handleRegisterClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card click
+  const handleRegisterPress = () => {
     if (onRegister && !isLoading) {
       onRegister(event.id);
     }
@@ -88,227 +69,214 @@ const EventCard: React.FC<EventCardProps> = ({
 
   if (isLoading) {
     return (
-      <Box
-        borderWidth={1}
-        borderRadius="lg"
-        borderColor={borderColor}
-        overflow="hidden"
-        bg={cardBgColor}
-        shadow="sm"
-        transition="all 0.2s"
-        _hover={{
-          shadow: 'md',
-          transform: 'translateY(-2px)',
-        }}
-        cursor="pointer"
-        role="article"
-        aria-label="Event card loading"
-      >
-        <Skeleton height="200px" />
-        <Box p={4}>
-          <VStack align="stretch" spacing={3}>
-            <Skeleton height="24px" />
-            <Skeleton height="16px" />
-            <Skeleton height="16px" />
-            <Skeleton height="20px" width="80px" />
-          </VStack>
-        </Box>
-      </Box>
+      <Card containerStyle={{ margin: spacing.sm }}>
+        <View style={{ height: 200, backgroundColor: colors.lightGrey }} />
+        <View style={{ padding: spacing.md }}>
+          <View style={{ height: 24, backgroundColor: colors.lightGrey, marginBottom: spacing.sm }} />
+          <View style={{ height: 16, backgroundColor: colors.lightGrey, marginBottom: spacing.sm }} />
+          <View style={{ height: 16, backgroundColor: colors.lightGrey, marginBottom: spacing.sm }} />
+          <View style={{ height: 20, width: 80, backgroundColor: colors.lightGrey }} />
+        </View>
+      </Card>
     );
   }
 
   return (
-    <Box
-      borderWidth={1}
-      borderRadius="lg"
-      borderColor={borderColor}
-      overflow="hidden"
-      bg={cardBgColor}
-      shadow="sm"
-      transition="all 0.2s"
-      _hover={{
-        shadow: 'md',
-        transform: 'translateY(-2px)',
-        borderColor: primaryColor,
+    <Card
+      containerStyle={{
+        margin: spacing.sm,
+        borderRadius: 8,
+        shadowColor: colors.dark,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
       }}
-      _focus={{
-        shadow: 'outline',
-        borderColor: primaryColor,
-      }}
-      cursor="pointer"
-      role="article"
-      tabIndex={0}
-      onClick={handleCardClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          handleCardClick();
-        }
-      }}
-      aria-label={`Event: ${event.title}`}
     >
-      {/* Event Image */}
-      <Box position="relative" height="200px" bg="#F8FAFC">
-        <Box
-          width="100%"
-          height="100%"
-          bg="#F8FAFC"
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          color={neutralMedium}
-          fontSize="sm"
-        >
-          🎟️ Event Image
-        </Box>
-        
-        {/* Favorite Button */}
-        {onFavorite && (
-          <Box position="absolute" top={3} right={3}>
-            <IconButton
-              icon={<StarIcon />}
-              size="sm"
-              variant="solid"
-              bg="white"
-              color={isFavorited ? '#EF4444' : neutralMedium}
-              shadow="sm"
-              _hover={{
-                bg: 'white',
-                color: '#EF4444',
-                transform: 'scale(1.1)',
+        {/* Event Image */}
+        <View style={{ position: 'relative' }}>
+          <View
+            style={{
+              height: 200,
+              backgroundColor: colors.lightGrey,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ color: colors.midGrey, fontSize: 14 }}>
+              🎟️ {t('events.eventName')}
+            </Text>
+          </View>
+          
+          {/* Favorite Button */}
+          {onFavorite && (
+            <TouchableOpacity
+              style={{
+                position: 'absolute',
+                top: spacing.sm,
+                right: spacing.sm,
+                backgroundColor: colors.white,
+                borderRadius: 20,
+                padding: spacing.xs,
+                shadowColor: colors.dark,
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.2,
+                shadowRadius: 2,
+                elevation: 2,
               }}
-              _focus={{
-                shadow: 'outline',
-              }}
-              onClick={handleFavoriteClick}
-              aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
-            />
-          </Box>
-        )}
-
-        {/* Event Status Badge */}
-        {event.status && (
-          <Box position="absolute" top={3} left={3}>
-            <Badge
-              colorScheme={event.status === 'published' ? 'green' : 'gray'}
-              variant="solid"
-              fontSize="xs"
-              textTransform="capitalize"
+              onPress={handleFavoritePress}
+              testID={`favorite-button-${event.id}`}
+              accessibilityLabel={isFavorited ? t('events.removeFromFavorites') : t('events.addToFavorites')}
             >
-              {event.status}
-            </Badge>
-          </Box>
-        )}
-      </Box>
+              <Icon
+                name="heart"
+                type="material-community"
+                color={isFavorited ? colors.danger : colors.midGrey}
+                size={20}
+              />
+            </TouchableOpacity>
+          )}
 
-      {/* Event Details */}
-      <Box p={4}>
-        <VStack align="stretch" spacing={3}>
+          {/* Event Status Badge */}
+          {event.status && event.status === 'published' && (
+            <Badge
+              value={event.status}
+              status="success"
+              containerStyle={{
+                position: 'absolute',
+                top: spacing.sm,
+                left: spacing.sm,
+              }}
+              badgeStyle={{
+                borderRadius: 12,
+              }}
+            />
+          )}
+        </View>
+
+        {/* Event Details */}
+        <Card.Divider />
+        <View style={{ padding: spacing.md }}>
           {/* Category */}
           {event.category && (
             <Badge
-              colorScheme="blue"
-              variant="subtle"
-              alignSelf="flex-start"
-              fontSize="xs"
-              textTransform="capitalize"
-            >
-              {event.category.name}
-            </Badge>
+              value={event.category.name}
+              status="primary"
+              containerStyle={{ alignSelf: 'flex-start', marginBottom: spacing.sm }}
+              badgeStyle={{
+                backgroundColor: colors.primary,
+                borderRadius: 12,
+              }}
+            />
           )}
 
           {/* Event Title */}
-          <Heading
-            as="h3"
-            size="md"
-            color={neutralDark}
-            noOfLines={2}
-            lineHeight="1.3"
-            fontSize="18px"
-            fontWeight="600"
+          <Text
+            h3
+            style={{
+              color: colors.dark,
+              marginBottom: spacing.sm,
+              lineHeight: 24,
+            }}
+            numberOfLines={2}
           >
             {event.title}
-          </Heading>
+          </Text>
 
           {/* Date and Time */}
-          <HStack spacing={2} color={neutralMedium}>
-            <CalendarIcon />
-            <Text fontSize="sm" lineHeight="1.5">
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
+            <Icon
+              name="calendar"
+              type="material-community"
+              color={colors.midGrey}
+              size={16}
+              containerStyle={{ marginRight: spacing.xs }}
+            />
+            <Text style={{ color: colors.midGrey, fontSize: 14 }}>
               {formatDate(event.startDate)} • {formatTime(event.startDate)}
             </Text>
-          </HStack>
+          </View>
 
           {/* Location */}
-          <HStack spacing={2} color={neutralMedium}>
-            <Text fontSize="sm" fontWeight="medium">📍</Text>
-            <Text fontSize="sm" lineHeight="1.5" noOfLines={1}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
+            <Icon
+              name="map-marker"
+              type="material-community"
+              color={colors.midGrey}
+              size={16}
+              containerStyle={{ marginRight: spacing.xs }}
+            />
+            <Text
+              style={{ color: colors.midGrey, fontSize: 14, flex: 1 }}
+              numberOfLines={1}
+            >
               {event.venue?.name || event.location}
             </Text>
-          </HStack>
+          </View>
 
           {/* Price */}
-          <VStack align="stretch" spacing={3} pt={2}>
-            <HStack spacing={2}>
-              <Text fontSize="sm" fontWeight="medium">💰</Text>
-              <Text
-                fontSize="lg"
-                fontWeight="bold"
-                color={successColor}
-                lineHeight="1.5"
-              >
-                From {getMinPrice()}
-              </Text>
-            </HStack>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md }}>
+            <Icon
+              name="currency-twd"
+              type="material-community"
+              color={colors.success}
+              size={16}
+              containerStyle={{ marginRight: spacing.xs }}
+            />
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: 'bold',
+                color: colors.success,
+              }}
+            >
+              {t('events.from')} {getMinPrice()}
+            </Text>
+          </View>
 
-            {/* Action Buttons */}
-            <HStack justify="space-between" align="center">
-              {/* Register Button - Only show for published events */}
-              {event.status === 'published' && onRegister && (
-                <Button
-                  size="sm"
-                  colorScheme="blue"
-                  variant="solid"
-                  backgroundColor={primaryColor}
-                  onClick={handleRegisterClick}
-                  _hover={{
-                    backgroundColor: '#1D4ED8',
-                  }}
-                  _active={{
-                    backgroundColor: '#1E40AF',
-                  }}
-                  _focus={{
-                    shadow: 'outline',
-                  }}
-                  aria-label={`Register for ${event.title}`}
-                  flex={1}
-                  mr={2}
-                >
-                  Register
-                </Button>
-              )}
-
-              {/* View Details Button */}
+          {/* Action Buttons */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            {/* Register Button - Only show for published events */}
+            {event.status === 'published' && onRegister && (
               <Button
-                size="sm"
-                colorScheme="primary"
-                variant="outline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCardClick();
+                title={t('events.register')}
+                onPress={handleRegisterPress}
+                buttonStyle={{
+                  backgroundColor: colors.primary,
+                  borderRadius: 8,
+                  paddingVertical: spacing.sm,
+                  flex: 1,
+                  marginRight: spacing.xs,
                 }}
-                _focus={{
-                  shadow: 'outline',
-                }}
-                aria-label={`View details for ${event.title}`}
-                flex={event.status === 'published' && onRegister ? 1 : 'auto'}
-              >
-                View Details
-              </Button>
-            </HStack>
-          </VStack>
-        </VStack>
-      </Box>
-    </Box>
+                titleStyle={{ fontSize: 14, fontWeight: '600' }}
+                testID={`register-button-${event.id}`}
+                accessibilityLabel={`${t('events.registerForEvent')} ${event.title}`}
+              />
+            )}
+
+            {/* View Details Button */}
+            <Button
+              title={t('events.viewDetails')}
+              type="outline"
+              onPress={handleViewDetailsPress}
+              buttonStyle={{
+                borderColor: colors.primary,
+                borderRadius: 8,
+                paddingVertical: spacing.sm,
+                flex: event.status === 'published' && onRegister ? 1 : undefined,
+                marginLeft: event.status === 'published' && onRegister ? spacing.xs : 0,
+              }}
+              titleStyle={{
+                color: colors.primary,
+                fontSize: 14,
+                fontWeight: '600',
+              }}
+              testID={`view-details-button-${event.id}`}
+              accessibilityLabel={`${t('events.viewDetails')} ${event.title}`}
+            />
+          </View>
+        </View>
+      </Card>
   );
 };
 

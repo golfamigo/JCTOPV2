@@ -1,7 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ChakraProvider } from '@chakra-ui/react';
-import { BrowserRouter, MemoryRouter } from 'react-router-dom';
+import { NavigationContainer } from '@react-navigation/native';
 import { CheckInModeScreen } from './CheckInModeScreen';
 import eventService from '../../../services/eventService';
 import statisticsService from '../../../services/statisticsService';

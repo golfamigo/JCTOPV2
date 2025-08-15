@@ -1,26 +1,22 @@
 import React, { useRef, useState, useEffect } from 'react';
 import {
-  Box,
-  VStack,
-  HStack,
-  Text,
-  IconButton,
+  View,
+  StyleSheet,
+  ActivityIndicator,
   Alert,
-  AlertIcon,
-  Spinner,
-  Center,
-  useColorModeValue,
+} from 'react-native';
+import {
+  Text,
+  Button,
+  Icon,
   Badge,
-} from '@chakra-ui/react';
-import { 
-  ViewIcon, 
-  RepeatIcon,
-  SunIcon,
-  MoonIcon,
-} from '@chakra-ui/icons';
-import { Camera, CameraType } from 'expo-camera';
+} from '@rneui/themed';
+import { MaterialIcons } from '@expo/vector-icons';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { BarCodeScanner } from 'expo-barcode-scanner';
 import { CameraService } from '../../../services/cameraService';
 import { getCameraPermissionErrorMessage } from '../../../utils/permissions';
+import { useAppTheme } from '@/theme';
 
 interface CameraScannerProps {
   onQRCodeScanned: (data: string) => void;
@@ -38,68 +34,33 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
   height = 400,
 }) => {
   const cameraRef = useRef<any>(null);
-  const [cameraType, setCameraType] = useState<CameraType>(CameraType.back);
+  const [cameraType, setCameraType] = useState<'back' | 'front'>('back');
   const [flashMode, setFlashMode] = useState<'on' | 'off' | 'auto'>('auto');
-  const [isLoading, setIsLoading] = useState(true);
   const [permissionError, setPermissionError] = useState<string>('');
   const [cameraReady, setCameraReady] = useState(false);
   const [lastScanned, setLastScanned] = useState<string>('');
   const [scanCooldown, setScanCooldown] = useState(false);
-
-  const cameraService = CameraService.getInstance();
   
-  const bgColor = useColorModeValue('white', 'neutral.800');
-  const borderColor = useColorModeValue('neutral.200', 'neutral.600');
-  const overlayColor = useColorModeValue('rgba(0,0,0,0.5)', 'rgba(0,0,0,0.7)');
+  const [permission, requestPermission] = useCameraPermissions();
+  const cameraService = CameraService.getInstance();
+  const { colors } = useAppTheme();
 
   useEffect(() => {
-    initializeCamera();
-    return () => {
-      cameraService.reset();
-    };
-  }, []);
-
-  const initializeCamera = async () => {
-    try {
-      setIsLoading(true);
-      const result = await cameraService.initialize();
-      
-      if (!result.success) {
-        const errorMessage = getCameraPermissionErrorMessage(result.data || {
-          granted: false,
-          canAskAgain: false,
-          status: 'denied'
-        });
-        setPermissionError(errorMessage);
-        onError?.(errorMessage);
-        return;
-      }
-
-      cameraService.setCameraRef(cameraRef);
-      setPermissionError('');
-    } catch (error) {
-      const errorMessage = `Failed to initialize camera: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      setPermissionError(errorMessage);
-      onError?.(errorMessage);
-    } finally {
-      setIsLoading(false);
+    if (!permission?.granted && permission?.canAskAgain) {
+      requestPermission();
     }
-  };
+  }, [permission]);
 
-  const onCameraReady = () => {
-    setCameraReady(true);
-  };
-
-  const handleBarCodeScanned = ({ data }: { data: string }) => {
-    if (!isScanning || scanCooldown || data === lastScanned) {
+  const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
+    if (isScanning || scanCooldown || data === lastScanned) {
       return;
     }
 
-    setLastScanned(data);
     setScanCooldown(true);
+    setLastScanned(data);
     onQRCodeScanned(data);
 
-    // Reset cooldown after 2 seconds to prevent duplicate scans
+    // Reset cooldown after 2 seconds
     setTimeout(() => {
       setScanCooldown(false);
       setLastScanned('');
@@ -107,220 +68,266 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
   };
 
   const toggleCameraType = () => {
-    const newType = cameraService.switchCameraType(cameraType);
-    setCameraType(newType);
+    setCameraType(current => current === 'back' ? 'front' : 'back');
   };
 
   const toggleFlashMode = () => {
-    const newMode = cameraService.toggleFlashMode(flashMode);
-    setFlashMode(newMode);
+    setFlashMode(current => {
+      switch (current) {
+        case 'off':
+          return 'on';
+        case 'on':
+          return 'auto';
+        case 'auto':
+        default:
+          return 'off';
+      }
+    });
   };
 
   const getFlashIcon = () => {
-    return flashMode === 'off' ? MoonIcon : SunIcon;
+    switch (flashMode) {
+      case 'on':
+        return 'flash-on';
+      case 'off':
+        return 'flash-off';
+      case 'auto':
+      default:
+        return 'flash-auto';
+    }
   };
 
-  if (permissionError) {
+  if (!permission) {
     return (
-      <Box
-        width={width}
-        height={height}
-        bg={bgColor}
-        border="2px solid"
-        borderColor="error.300"
-        borderRadius="12px"
-        p={6}
-      >
-        <Alert status="error">
-          <AlertIcon />
-          <Text fontSize="md">{permissionError}</Text>
-        </Alert>
-      </Box>
+      <View style={[styles.container, { height }] as any}>
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Initializing camera...</Text>
+        </View>
+      </View>
     );
   }
 
-  if (isLoading) {
+  if (!permission.granted) {
     return (
-      <Box
-        width={width}
-        height={height}
-        bg={bgColor}
-        border="2px solid"
-        borderColor={borderColor}
-        borderRadius="12px"
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-      >
-        <Center>
-          <VStack spacing={4}>
-            <Spinner size="xl" color="primary.500" thickness="4px" />
-            <Text fontSize="lg" color="neutral.600">
-              Initializing camera...
-            </Text>
-          </VStack>
-        </Center>
-      </Box>
+      <View style={[styles.container, { height }] as any}>
+        <View style={styles.errorContainer}>
+          <Icon
+            name="camera-off"
+            type="material"
+            color={colors.error}
+            size={48}
+          />
+          <Text style={styles.errorTitle}>Camera Access Required</Text>
+          <Text style={styles.errorMessage}>
+            {permissionError || 'Camera permission was denied'}
+          </Text>
+          <Button
+            title="Grant Permission"
+            onPress={requestPermission}
+            buttonStyle={[styles.permissionButton, { backgroundColor: colors.primary }]}
+          />
+        </View>
+      </View>
     );
   }
 
   return (
-    <Box
-      width={width}
-      height={height}
-      position="relative"
-      borderRadius="12px"
-      overflow="hidden"
-      border="2px solid"
-      borderColor={isScanning ? 'success.400' : borderColor}
-      boxShadow={isScanning ? '0 0 20px rgba(16, 185, 129, 0.3)' : 'none'}
-    >
-      <Camera
+    <View style={[styles.container, { height: height as any }]}>
+      <CameraView
         ref={cameraRef}
-        style={{ flex: 1 }}
+        style={styles.camera}
         facing={cameraType}
         flash={flashMode}
-        onCameraReady={onCameraReady}
-        onBarcodeScanned={cameraReady ? handleBarCodeScanned : undefined}
+        onCameraReady={() => setCameraReady(true)}
+        onBarcodeScanned={handleBarCodeScanned}
         barcodeScannerSettings={{
           barcodeTypes: ['qr'],
         }}
-      />
-      
-      {/* Scanning overlay */}
-      <Box
-        position="absolute"
-        top={0}
-        left={0}
-        right={0}
-        bottom={0}
-        pointerEvents="none"
       >
-        {/* Top overlay */}
-        <Box
-          position="absolute"
-          top={0}
-          left={0}
-          right={0}
-          height="25%"
-          bg={overlayColor}
-        />
-        
-        {/* Bottom overlay */}
-        <Box
-          position="absolute"
-          bottom={0}
-          left={0}
-          right={0}
-          height="25%"
-          bg={overlayColor}
-        />
-        
-        {/* Left overlay */}
-        <Box
-          position="absolute"
-          top="25%"
-          left={0}
-          width="15%"
-          height="50%"
-          bg={overlayColor}
-        />
-        
-        {/* Right overlay */}
-        <Box
-          position="absolute"
-          top="25%"
-          right={0}
-          width="15%"
-          height="50%"
-          bg={overlayColor}
-        />
-        
-        {/* Scanning frame */}
-        <Box
-          position="absolute"
-          top="25%"
-          left="15%"
-          width="70%"
-          height="50%"
-          border="3px solid"
-          borderColor={isScanning ? 'success.400' : 'primary.400'}
-          borderRadius="12px"
-          _before={{
-            content: '""',
-            position: 'absolute',
-            top: '-3px',
-            left: '-3px',
-            right: '-3px',
-            bottom: '-3px',
-            border: '1px solid',
-            borderColor: 'white',
-            borderRadius: '15px',
-          }}
-        />
-      </Box>
+        {/* Scanning Overlay */}
+        <View style={styles.overlay}>
+          {/* Top Controls */}
+          <View style={styles.topControls}>
+            <View style={styles.controlsRow}>
+              <Button
+                icon={
+                  <Icon
+                    name={getFlashIcon()}
+                    type="material"
+                    color={colors.white}
+                    size={24}
+                  />
+                }
+                onPress={toggleFlashMode}
+                type="clear"
+              />
+              <Badge
+                value={isScanning ? 'Scanning...' : 'Ready'}
+                badgeStyle={[
+                  styles.statusBadge,
+                  { backgroundColor: isScanning ? colors.warning : colors.success }
+                ]}
+              />
+              <Button
+                icon={
+                  <Icon
+                    name="flip-camera-ios"
+                    type="material"
+                    color={colors.white}
+                    size={24}
+                  />
+                }
+                onPress={toggleCameraType}
+                type="clear"
+              />
+            </View>
+          </View>
 
-      {/* Camera controls */}
-      <Box
-        position="absolute"
-        top={4}
-        right={4}
-      >
-        <VStack spacing={2}>
-          <IconButton
-            aria-label="Toggle flash"
-            icon={React.createElement(getFlashIcon())}
-            size="md"
-            colorScheme="whiteAlpha"
-            bg="rgba(0,0,0,0.6)"
-            color="white"
-            _hover={{ bg: 'rgba(0,0,0,0.8)' }}
-            onClick={toggleFlashMode}
-          />
-          <IconButton
-            aria-label="Switch camera"
-            icon={<RepeatIcon />}
-            size="md"
-            colorScheme="whiteAlpha"
-            bg="rgba(0,0,0,0.6)"
-            color="white"
-            _hover={{ bg: 'rgba(0,0,0,0.8)' }}
-            onClick={toggleCameraType}
-          />
-        </VStack>
-      </Box>
+          {/* Scan Frame */}
+          <View style={styles.scanArea}>
+            <View style={styles.scanFrame}>
+              <View style={[styles.corner, styles.topLeft]} />
+              <View style={[styles.corner, styles.topRight]} />
+              <View style={[styles.corner, styles.bottomLeft]} />
+              <View style={[styles.corner, styles.bottomRight]} />
+            </View>
+            {isScanning && (
+              <ActivityIndicator
+                size="large"
+                color={colors.primary}
+                style={styles.scanningIndicator}
+              />
+            )}
+          </View>
 
-      {/* Status indicators */}
-      <Box
-        position="absolute"
-        bottom={4}
-        left={4}
-        right={4}
-      >
-        <HStack justify="space-between" align="center">
-          <Badge
-            colorScheme={isScanning ? 'green' : 'gray'}
-            variant="solid"
-            px={3}
-            py={1}
-            borderRadius="full"
-          >
-            {isScanning ? 'Scanning...' : 'Ready'}
-          </Badge>
-          
-          {scanCooldown && (
-            <Badge
-              colorScheme="blue"
-              variant="solid"
-              px={3}
-              py={1}
-              borderRadius="full"
-            >
-              Processing...
-            </Badge>
-          )}
-        </HStack>
-      </Box>
-    </Box>
+          {/* Bottom Instructions */}
+          <View style={styles.bottomInstructions}>
+            <Text style={styles.instructionText}>
+              Position QR code within the frame
+            </Text>
+          </View>
+        </View>
+      </CameraView>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    width: '100%',
+    backgroundColor: '#000',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#f5f5f5',
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 10,
+    color: '#333',
+  },
+  errorMessage: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginVertical: 10,
+  },
+  permissionButton: {
+    marginTop: 15,
+    paddingHorizontal: 30,
+    borderRadius: 8,
+  },
+  camera: {
+    flex: 1,
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  topControls: {
+    paddingTop: 20,
+    paddingHorizontal: 20,
+  },
+  controlsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statusBadge: {
+    borderRadius: 4,
+    paddingHorizontal: 12,
+  },
+  scanArea: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanFrame: {
+    width: 250,
+    height: 250,
+    position: 'relative',
+  },
+  corner: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderColor: '#fff',
+    borderWidth: 3,
+  },
+  topLeft: {
+    top: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+  },
+  topRight: {
+    top: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderBottomWidth: 0,
+  },
+  bottomLeft: {
+    bottom: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderTopWidth: 0,
+  },
+  bottomRight: {
+    bottom: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderTopWidth: 0,
+  },
+  scanningIndicator: {
+    position: 'absolute',
+  },
+  bottomInstructions: {
+    paddingBottom: 30,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  instructionText: {
+    fontSize: 16,
+    color: '#fff',
+    textAlign: 'center',
+  },
+});
+
+export default CameraScanner;

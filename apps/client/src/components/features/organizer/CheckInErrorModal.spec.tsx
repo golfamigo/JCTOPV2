@@ -1,6 +1,5 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ChakraProvider } from '@chakra-ui/react';
 import { CheckInErrorModal } from './CheckInErrorModal';
 
 const renderWithChakra = (component: React.ReactElement) => {

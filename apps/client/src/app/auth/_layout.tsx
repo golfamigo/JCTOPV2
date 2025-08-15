@@ -38,8 +38,7 @@ export default function AuthLayout() {
           headerShown: false,
         }}
       />
-      {/* Future auth pages can be added here */}
-      {/* 
+      {/* Password reset flow screens */}
       <Stack.Screen
         name="forgot-password"
         options={{
@@ -54,7 +53,6 @@ export default function AuthLayout() {
           headerShown: false,
         }}
       />
-      */}
     </Stack>
   );
 }

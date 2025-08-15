@@ -1,6 +1,5 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ChakraProvider } from '@chakra-ui/react';
 import AttendeeManagementPage from './AttendeeManagementPage';
 import attendeeService from '../../../services/attendeeService';
 import eventService from '../../../services/eventService';
@@ -14,10 +13,7 @@ const mockEventService = eventService as jest.Mocked<typeof eventService>;
 
 // Mock toast
 const mockToast = jest.fn();
-jest.mock('@chakra-ui/react', () => ({
-  ...jest.requireActual('@chakra-ui/react'),
-  useToast: () => mockToast,
-}));
+// Removed ChakraUI mock
 
 const mockEvent = {
   id: 'event-1',

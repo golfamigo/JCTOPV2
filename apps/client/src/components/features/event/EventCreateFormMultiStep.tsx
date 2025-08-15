@@ -1,21 +1,11 @@
 import React, { useState } from 'react';
-import {
-  Box,
-  Button,
-  FormControl,
-  FormLabel,
-  Input,
-  Textarea,
-  Select,
-  VStack,
-  HStack,
-  FormErrorMessage,
-  Heading,
-  useToast,
-  Progress,
-  Divider,
-} from '@chakra-ui/react';
+import { View, ScrollView, Alert, StyleSheet, Platform } from 'react-native';
+import { Button, Input, Text, Card, Divider } from '@rneui/themed';
+import { Picker } from '@react-native-picker/picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { MaterialIcons } from '@expo/vector-icons';
 import { CreateEventDto, TicketType, SeatingZone } from '@jctop-event/shared-types';
+import { useAppTheme } from '../../../theme';
 import StepIndicator from '../../common/StepIndicator';
 import TicketConfiguration from './TicketConfiguration';
 import SeatingConfiguration from './SeatingConfiguration';
@@ -53,7 +43,7 @@ const EventCreateFormMultiStep: React.FC<EventCreateFormMultiStepProps> = ({
   categories = [],
   venues = [],
 }) => {
-  const toast = useToast();
+  const { colors, spacing } = useAppTheme();
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<FormData>({
     title: '',
@@ -65,408 +55,333 @@ const EventCreateFormMultiStep: React.FC<EventCreateFormMultiStepProps> = ({
     venueId: '',
   });
   
+  const [errors, setErrors] = useState<FormErrors>({});
   const [ticketTypes, setTicketTypes] = useState<TicketType[]>([]);
   const [seatingZones, setSeatingZones] = useState<SeatingZone[]>([]);
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
 
   const steps = [
-    {
-      title: 'Event Details',
-      description: 'Basic event information',
-    },
-    {
-      title: 'Tickets & Seating',
-      description: 'Configure pricing and capacity',
-    },
-    {
-      title: 'Review & Submit',
-      description: 'Confirm and create event',
-    },
+    { title: 'Basic Info', description: 'Event details' },
+    { title: 'Date & Location', description: 'When and where' },
+    { title: 'Tickets', description: 'Pricing and capacity' },
+    { title: 'Seating', description: 'Optional seating zones' },
+    { title: 'Review', description: 'Confirm details' },
   ];
 
-  const validateEventDetails = (): boolean => {
+  const validateStep = (step: number): boolean => {
     const newErrors: FormErrors = {};
-
-    if (!formData.title.trim()) {
-      newErrors.title = 'Title is required';
-    } else if (formData.title.length > 255) {
-      newErrors.title = 'Title cannot exceed 255 characters';
+    
+    switch (step) {
+      case 0:
+        if (!formData.title.trim()) {
+          newErrors.title = 'Event title is required';
+        }
+        if (!formData.description.trim()) {
+          newErrors.description = 'Event description is required';
+        }
+        break;
+      case 1:
+        if (!formData.startDate) {
+          newErrors.startDate = 'Start date is required';
+        }
+        if (!formData.endDate) {
+          newErrors.endDate = 'End date is required';
+        }
+        if (formData.startDate && formData.endDate) {
+          const start = new Date(formData.startDate);
+          const end = new Date(formData.endDate);
+          if (end < start) {
+            newErrors.endDate = 'End date must be after start date';
+          }
+        }
+        if (!formData.location.trim()) {
+          newErrors.location = 'Location is required';
+        }
+        break;
+      case 2:
+        if (ticketTypes.length === 0) {
+          Alert.alert('Error', 'At least one ticket type is required');
+          return false;
+        }
+        break;
     }
-
-    if (!formData.startDate) {
-      newErrors.startDate = 'Start date is required';
-    } else if (new Date(formData.startDate) <= new Date()) {
-      newErrors.startDate = 'Start date must be in the future';
-    }
-
-    if (!formData.endDate) {
-      newErrors.endDate = 'End date is required';
-    } else if (formData.startDate && new Date(formData.endDate) <= new Date(formData.startDate)) {
-      newErrors.endDate = 'End date must be after start date';
-    }
-
-    if (!formData.location.trim()) {
-      newErrors.location = 'Location is required';
-    }
-
-    if (!formData.categoryId) {
-      newErrors.categoryId = 'Category is required';
-    }
-
-    if (!formData.venueId) {
-      newErrors.venueId = 'Venue is required';
-    }
-
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const validateTicketsAndSeating = (): boolean => {
-    let isValid = true;
-
-    if (ticketTypes.length === 0) {
-      toast({
-        title: 'Validation Error',
-        description: 'At least one ticket type is required',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-      isValid = false;
-    }
-
-    if (seatingZones.length === 0) {
-      toast({
-        title: 'Validation Error',
-        description: 'At least one seating zone is required',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-      isValid = false;
-    }
-
-    // Check for duplicate ticket names
-    const ticketNames = ticketTypes.map(tt => tt.name.trim().toLowerCase());
-    const uniqueTicketNames = new Set(ticketNames);
-    if (ticketNames.length !== uniqueTicketNames.size) {
-      toast({
-        title: 'Validation Error',
-        description: 'Ticket names must be unique',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-      isValid = false;
-    }
-
-    // Check for duplicate seating zone names
-    const zoneNames = seatingZones.map(sz => sz.name.trim().toLowerCase());
-    const uniqueZoneNames = new Set(zoneNames);
-    if (zoneNames.length !== uniqueZoneNames.size) {
-      toast({
-        title: 'Validation Error',
-        description: 'Seating zone names must be unique',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-      isValid = false;
-    }
-
-    return isValid;
-  };
-
-  const handleInputChange = (field: keyof FormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
-    }
-  };
-
   const handleNext = () => {
-    if (currentStep === 0) {
-      if (!validateEventDetails()) {
-        toast({
-          title: 'Validation Error',
-          description: 'Please correct the errors in the form',
-          status: 'error',
-          duration: 3000,
-          isClosable: true,
-        });
-        return;
-      }
-    } else if (currentStep === 1) {
-      if (!validateTicketsAndSeating()) {
-        return;
-      }
+    if (validateStep(currentStep)) {
+      setCurrentStep(prev => Math.min(prev + 1, steps.length - 1));
     }
-
-    setCurrentStep(prev => Math.min(prev + 1, steps.length - 1));
   };
 
   const handlePrevious = () => {
     setCurrentStep(prev => Math.max(prev - 1, 0));
   };
 
-  const handleSubmit = () => {
-    if (!validateEventDetails() || !validateTicketsAndSeating()) {
-      toast({
-        title: 'Validation Error',
-        description: 'Please correct all errors before submitting',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
+  const handleInputChange = (field: keyof FormData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: undefined }));
     }
-
-    const eventData: CreateEventDto & { ticketTypes: TicketType[]; seatingZones: SeatingZone[] } = {
-      title: formData.title.trim(),
-      description: formData.description.trim() || undefined,
-      startDate: formData.startDate,
-      endDate: formData.endDate,
-      location: formData.location.trim(),
-      categoryId: formData.categoryId,
-      venueId: formData.venueId,
-      ticketTypes,
-      seatingZones,
-    };
-
-    onSubmit(eventData);
   };
 
-  const getSelectedVenue = () => {
-    return venues.find(venue => venue.id === formData.venueId);
+  const handleDateChange = (event: any, selectedDate: Date | undefined, type: 'start' | 'end') => {
+    if (type === 'start') {
+      setShowStartPicker(false);
+      if (selectedDate) {
+        setStartDate(selectedDate);
+        handleInputChange('startDate', selectedDate.toISOString());
+      }
+    } else {
+      setShowEndPicker(false);
+      if (selectedDate) {
+        setEndDate(selectedDate);
+        handleInputChange('endDate', selectedDate.toISOString());
+      }
+    }
+  };
+
+  const handleSubmit = () => {
+    if (validateStep(currentStep)) {
+      const eventData = {
+        ...formData,
+        categoryId: formData.categoryId || undefined,
+        venueId: formData.venueId || undefined,
+        ticketTypes,
+        seatingZones,
+      };
+      onSubmit(eventData);
+    }
   };
 
   const renderStepContent = () => {
     switch (currentStep) {
       case 0:
         return (
-          <VStack spacing={6} align="stretch">
-            <FormControl isRequired isInvalid={!!errors.title}>
-              <FormLabel htmlFor="title">Event Title</FormLabel>
+          <View style={styles.stepContent}>
+            <Text style={[styles.stepTitle, { color: colors.text }]}>Basic Information</Text>
+            
+            <View style={styles.formGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>Event Title *</Text>
               <Input
-                id="title"
-                type="text"
-                value={formData.title}
-                onChange={(e) => handleInputChange('title', e.target.value)}
                 placeholder="Enter event title"
-                size="md"
-                aria-describedby={errors.title ? 'title-error' : undefined}
+                value={formData.title}
+                onChangeText={(value) => handleInputChange('title', value)}
+                errorMessage={errors.title}
+                disabled={isLoading}
               />
-              <FormErrorMessage id="title-error">{errors.title}</FormErrorMessage>
-            </FormControl>
+            </View>
 
-            <FormControl>
-              <FormLabel htmlFor="description">Description</FormLabel>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => handleInputChange('description', e.target.value)}
-                placeholder="Enter event description (optional)"
-                resize="vertical"
-                minH="100px"
-              />
-            </FormControl>
-
-            <HStack spacing={4} align="flex-start">
-              <FormControl isRequired isInvalid={!!errors.startDate} flex={1}>
-                <FormLabel htmlFor="startDate">Start Date & Time</FormLabel>
-                <Input
-                  id="startDate"
-                  type="datetime-local"
-                  value={formData.startDate}
-                  onChange={(e) => handleInputChange('startDate', e.target.value)}
-                  size="md"
-                  aria-describedby={errors.startDate ? 'start-date-error' : undefined}
-                />
-                <FormErrorMessage id="start-date-error">{errors.startDate}</FormErrorMessage>
-              </FormControl>
-
-              <FormControl isRequired isInvalid={!!errors.endDate} flex={1}>
-                <FormLabel htmlFor="endDate">End Date & Time</FormLabel>
-                <Input
-                  id="endDate"
-                  type="datetime-local"
-                  value={formData.endDate}
-                  onChange={(e) => handleInputChange('endDate', e.target.value)}
-                  size="md"
-                  aria-describedby={errors.endDate ? 'end-date-error' : undefined}
-                />
-                <FormErrorMessage id="end-date-error">{errors.endDate}</FormErrorMessage>
-              </FormControl>
-            </HStack>
-
-            <FormControl isRequired isInvalid={!!errors.location}>
-              <FormLabel htmlFor="location">Location</FormLabel>
+            <View style={styles.formGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>Description *</Text>
               <Input
-                id="location"
-                type="text"
-                value={formData.location}
-                onChange={(e) => handleInputChange('location', e.target.value)}
-                placeholder="Enter event location"
-                size="md"
-                aria-describedby={errors.location ? 'location-error' : undefined}
+                placeholder="Enter event description"
+                value={formData.description}
+                onChangeText={(value) => handleInputChange('description', value)}
+                multiline
+                numberOfLines={4}
+                errorMessage={errors.description}
+                disabled={isLoading}
+                inputStyle={{ textAlignVertical: 'top' }}
               />
-              <FormErrorMessage id="location-error">{errors.location}</FormErrorMessage>
-            </FormControl>
+            </View>
 
-            <HStack spacing={4} align="flex-start">
-              <FormControl isRequired isInvalid={!!errors.categoryId} flex={1}>
-                <FormLabel htmlFor="categoryId">Category</FormLabel>
-                <Select
-                  id="categoryId"
-                  value={formData.categoryId}
-                  onChange={(e) => handleInputChange('categoryId', e.target.value)}
-                  placeholder="Select a category"
-                  size="md"
-                  aria-describedby={errors.categoryId ? 'category-error' : undefined}
-                >
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </Select>
-                <FormErrorMessage id="category-error">{errors.categoryId}</FormErrorMessage>
-              </FormControl>
-
-              <FormControl isRequired isInvalid={!!errors.venueId} flex={1}>
-                <FormLabel htmlFor="venueId">Venue</FormLabel>
-                <Select
-                  id="venueId"
-                  value={formData.venueId}
-                  onChange={(e) => handleInputChange('venueId', e.target.value)}
-                  placeholder="Select a venue"
-                  size="md"
-                  aria-describedby={errors.venueId ? 'venue-error' : undefined}
-                >
-                  {venues.map((venue) => (
-                    <option key={venue.id} value={venue.id}>
-                      {venue.name}
-                    </option>
-                  ))}
-                </Select>
-                <FormErrorMessage id="venue-error">{errors.venueId}</FormErrorMessage>
-              </FormControl>
-            </HStack>
-          </VStack>
+            {categories.length > 0 && (
+              <View style={styles.formGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Category</Text>
+                <View style={[styles.pickerContainer, { borderColor: colors.grey4 }]}>
+                  <Picker
+                    selectedValue={formData.categoryId}
+                    onValueChange={(value) => handleInputChange('categoryId', value)}
+                    enabled={!isLoading}
+                    style={{ color: colors.text }}
+                  >
+                    <Picker.Item label="Select a category" value="" />
+                    {categories.map(category => (
+                      <Picker.Item
+                        key={category.id}
+                        label={category.name}
+                        value={category.id}
+                      />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+            )}
+          </View>
         );
 
       case 1:
         return (
-          <VStack spacing={8} align="stretch">
-            <TicketConfiguration 
-              ticketTypes={ticketTypes}
-              onChange={setTicketTypes}
-            />
+          <View style={styles.stepContent}>
+            <Text style={[styles.stepTitle, { color: colors.text }]}>Date & Location</Text>
             
-            <Divider />
-            
-            <SeatingConfiguration 
-              seatingZones={seatingZones}
-              onChange={setSeatingZones}
-              venueCapacity={getSelectedVenue()?.capacity}
-            />
-          </VStack>
+            <View style={styles.formGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>Start Date *</Text>
+              <Button
+                title={formData.startDate ? new Date(formData.startDate).toLocaleString() : 'Select start date'}
+                onPress={() => setShowStartPicker(true)}
+                type="outline"
+                buttonStyle={[styles.dateButton, { borderColor: errors.startDate ? colors.error : colors.grey4 }]}
+                titleStyle={{ color: formData.startDate ? colors.text : colors.grey3 }}
+              />
+              {errors.startDate && (
+                <Text style={[styles.errorText, { color: colors.error }]}>{errors.startDate}</Text>
+              )}
+              {showStartPicker && (
+                <DateTimePicker
+                  value={startDate}
+                  mode="datetime"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, date) => handleDateChange(event, date, 'start')}
+                />
+              )}
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>End Date *</Text>
+              <Button
+                title={formData.endDate ? new Date(formData.endDate).toLocaleString() : 'Select end date'}
+                onPress={() => setShowEndPicker(true)}
+                type="outline"
+                buttonStyle={[styles.dateButton, { borderColor: errors.endDate ? colors.error : colors.grey4 }]}
+                titleStyle={{ color: formData.endDate ? colors.text : colors.grey3 }}
+              />
+              {errors.endDate && (
+                <Text style={[styles.errorText, { color: colors.error }]}>{errors.endDate}</Text>
+              )}
+              {showEndPicker && (
+                <DateTimePicker
+                  value={endDate}
+                  mode="datetime"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, date) => handleDateChange(event, date, 'end')}
+                />
+              )}
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>Location *</Text>
+              <Input
+                placeholder="Enter event location"
+                value={formData.location}
+                onChangeText={(value) => handleInputChange('location', value)}
+                errorMessage={errors.location}
+                disabled={isLoading}
+              />
+            </View>
+
+            {venues.length > 0 && (
+              <View style={styles.formGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Venue</Text>
+                <View style={[styles.pickerContainer, { borderColor: colors.grey4 }]}>
+                  <Picker
+                    selectedValue={formData.venueId}
+                    onValueChange={(value) => handleInputChange('venueId', value)}
+                    enabled={!isLoading}
+                    style={{ color: colors.text }}
+                  >
+                    <Picker.Item label="Select a venue" value="" />
+                    {venues.map(venue => (
+                      <Picker.Item
+                        key={venue.id}
+                        label={venue.name}
+                        value={venue.id}
+                      />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+            )}
+          </View>
         );
 
       case 2:
-        const selectedVenue = getSelectedVenue();
-        const selectedCategory = categories.find(cat => cat.id === formData.categoryId);
-        const totalTicketCapacity = ticketTypes.reduce((sum, tt) => sum + tt.quantity, 0);
-        const totalSeatingCapacity = seatingZones.reduce((sum, sz) => sum + sz.capacity, 0);
-        const potentialRevenue = ticketTypes.reduce((sum, tt) => sum + (tt.price * tt.quantity), 0);
-
         return (
-          <VStack spacing={6} align="stretch">
-            <Heading as="h3" size="lg" color="neutral.900">
-              Review Your Event
-            </Heading>
+          <View style={styles.stepContent}>
+            <Text style={[styles.stepTitle, { color: colors.text }]}>Ticket Configuration</Text>
+            <TicketConfiguration
+              ticketTypes={ticketTypes}
+              onChange={setTicketTypes}
+            />
+          </View>
+        );
 
-            <Box borderWidth="1px" borderColor="neutral.200" borderRadius="md" p={4}>
-              <Heading as="h4" size="md" mb={3} color="neutral.700">
-                Event Details
-              </Heading>
-              <VStack spacing={2} align="start">
-                <HStack justify="space-between" w="full">
-                  <strong>Title:</strong>
-                  <span>{formData.title}</span>
-                </HStack>
-                <HStack justify="space-between" w="full">
-                  <strong>Category:</strong>
-                  <span>{selectedCategory?.name}</span>
-                </HStack>
-                <HStack justify="space-between" w="full">
-                  <strong>Venue:</strong>
-                  <span>{selectedVenue?.name}</span>
-                </HStack>
-                <HStack justify="space-between" w="full">
-                  <strong>Location:</strong>
-                  <span>{formData.location}</span>
-                </HStack>
-                <HStack justify="space-between" w="full">
-                  <strong>Start:</strong>
-                  <span>{new Date(formData.startDate).toLocaleString()}</span>
-                </HStack>
-                <HStack justify="space-between" w="full">
-                  <strong>End:</strong>
-                  <span>{new Date(formData.endDate).toLocaleString()}</span>
-                </HStack>
-              </VStack>
-            </Box>
+      case 3:
+        return (
+          <View style={styles.stepContent}>
+            <Text style={[styles.stepTitle, { color: colors.text }]}>Seating Configuration (Optional)</Text>
+            <SeatingConfiguration
+              seatingZones={seatingZones}
+              onChange={setSeatingZones}
+              venueCapacity={venues.find(v => v.id === formData.venueId)?.capacity}
+            />
+          </View>
+        );
 
-            <Box borderWidth="1px" borderColor="neutral.200" borderRadius="md" p={4}>
-              <Heading as="h4" size="md" mb={3} color="neutral.700">
-                Ticket Types ({ticketTypes.length})
-              </Heading>
-              <VStack spacing={2} align="stretch">
-                {ticketTypes.map((ticket, index) => (
-                  <HStack key={index} justify="space-between" w="full">
-                    <span>{ticket.name}</span>
-                    <span>${ticket.price.toFixed(2)} × {ticket.quantity}</span>
-                  </HStack>
-                ))}
-              </VStack>
-            </Box>
-
-            <Box borderWidth="1px" borderColor="neutral.200" borderRadius="md" p={4}>
-              <Heading as="h4" size="md" mb={3} color="neutral.700">
-                Seating Zones ({seatingZones.length})
-              </Heading>
-              <VStack spacing={2} align="stretch">
-                {seatingZones.map((zone, index) => (
-                  <HStack key={index} justify="space-between" w="full">
-                    <span>{zone.name}</span>
-                    <span>{zone.capacity} seats</span>
-                  </HStack>
-                ))}
-              </VStack>
-            </Box>
-
-            <Box bg="primary.50" p={4} borderRadius="md">
-              <Heading as="h4" size="sm" mb={3} color="primary.700">
-                Event Summary
-              </Heading>
-              <VStack spacing={2} align="stretch">
-                <HStack justify="space-between" w="full">
-                  <span>Total Ticket Capacity:</span>
-                  <strong>{totalTicketCapacity.toLocaleString()}</strong>
-                </HStack>
-                <HStack justify="space-between" w="full">
-                  <span>Total Seating Capacity:</span>
-                  <strong>{totalSeatingCapacity.toLocaleString()}</strong>
-                </HStack>
-                <HStack justify="space-between" w="full">
-                  <span>Potential Revenue:</span>
-                  <strong>${potentialRevenue.toFixed(2)}</strong>
-                </HStack>
-              </VStack>
-            </Box>
-          </VStack>
+      case 4:
+        return (
+          <View style={styles.stepContent}>
+            <Text style={[styles.stepTitle, { color: colors.text }]}>Review & Confirm</Text>
+            
+            <Card containerStyle={styles.reviewCard}>
+              <Text h4 style={{ marginBottom: spacing.md }}>Event Details</Text>
+              <View style={styles.reviewItem}>
+                <Text style={styles.reviewLabel}>Title:</Text>
+                <Text style={styles.reviewValue}>{formData.title}</Text>
+              </View>
+              <View style={styles.reviewItem}>
+                <Text style={styles.reviewLabel}>Description:</Text>
+                <Text style={styles.reviewValue}>{formData.description}</Text>
+              </View>
+              <View style={styles.reviewItem}>
+                <Text style={styles.reviewLabel}>Start Date:</Text>
+                <Text style={styles.reviewValue}>
+                  {formData.startDate ? new Date(formData.startDate).toLocaleString() : 'Not set'}
+                </Text>
+              </View>
+              <View style={styles.reviewItem}>
+                <Text style={styles.reviewLabel}>End Date:</Text>
+                <Text style={styles.reviewValue}>
+                  {formData.endDate ? new Date(formData.endDate).toLocaleString() : 'Not set'}
+                </Text>
+              </View>
+              <View style={styles.reviewItem}>
+                <Text style={styles.reviewLabel}>Location:</Text>
+                <Text style={styles.reviewValue}>{formData.location}</Text>
+              </View>
+              
+              <Divider style={{ marginVertical: spacing.md }} />
+              
+              <Text h4 style={{ marginBottom: spacing.md }}>Tickets</Text>
+              {ticketTypes.map((ticket, index) => (
+                <View key={index} style={styles.reviewItem}>
+                  <Text style={styles.reviewLabel}>{ticket.name}:</Text>
+                  <Text style={styles.reviewValue}>
+                    NT${ticket.price} ({ticket.quantity} available)
+                  </Text>
+                </View>
+              ))}
+              
+              {seatingZones.length > 0 && (
+                <>
+                  <Divider style={{ marginVertical: spacing.md }} />
+                  <Text h4 style={{ marginBottom: spacing.md }}>Seating Zones</Text>
+                  {seatingZones.map((zone, index) => (
+                    <View key={index} style={styles.reviewItem}>
+                      <Text style={styles.reviewLabel}>{zone.name}:</Text>
+                      <Text style={styles.reviewValue}>{zone.capacity} seats</Text>
+                    </View>
+                  ))}
+                </>
+              )}
+            </Card>
+          </View>
         );
 
       default:
@@ -475,63 +390,141 @@ const EventCreateFormMultiStep: React.FC<EventCreateFormMultiStepProps> = ({
   };
 
   return (
-    <Box maxW="800px" mx="auto" p={{ base: 4, md: 6 }}>
-      <VStack spacing={8} align="stretch">
-        <Box>
-          <Heading as="h1" size="xl" mb={2} color="neutral.900">
-            Create New Event
-          </Heading>
-          <Progress 
-            value={(currentStep / (steps.length - 1)) * 100} 
-            colorScheme="primary" 
-            size="sm" 
-            borderRadius="full"
-          />
-        </Box>
+    <ScrollView showsVerticalScrollIndicator={false}>
+      <Card containerStyle={styles.container}>
+        <View style={styles.progressContainer}>
+          <View style={[styles.progressBar, { backgroundColor: colors.grey5 }]}>
+            <View 
+              style={[
+                styles.progressFill, 
+                { 
+                  backgroundColor: colors.primary,
+                  width: `${((currentStep + 1) / steps.length) * 100}%`
+                }
+              ]} 
+            />
+          </View>
+        </View>
 
-        <StepIndicator 
+        <StepIndicator
           steps={steps}
           currentStep={currentStep}
-          size="md"
         />
 
-        <Box minH="400px">
-          {renderStepContent()}
-        </Box>
+        <Divider style={{ marginVertical: spacing.lg }} />
 
-        <HStack justify="space-between" pt={4}>
-          <Button
-            variant="outline"
-            onClick={handlePrevious}
-            isDisabled={currentStep === 0}
-            size="lg"
-          >
-            Previous
-          </Button>
+        {renderStepContent()}
 
+        <View style={styles.navigationButtons}>
+          {currentStep > 0 && (
+            <Button
+              title="Previous"
+              type="outline"
+              onPress={handlePrevious}
+              disabled={isLoading}
+              buttonStyle={styles.navButton}
+            />
+          )}
+          
           {currentStep < steps.length - 1 ? (
             <Button
-              colorScheme="primary"
-              onClick={handleNext}
-              size="lg"
-            >
-              Next
-            </Button>
+              title="Next"
+              onPress={handleNext}
+              disabled={isLoading}
+              buttonStyle={[styles.navButton, { backgroundColor: colors.primary }]}
+            />
           ) : (
             <Button
-              colorScheme="primary"
-              onClick={handleSubmit}
-              isLoading={isLoading}
-              loadingText="Creating Event..."
-              size="lg"
-            >
-              Create Event
-            </Button>
+              title="Create Event"
+              onPress={handleSubmit}
+              loading={isLoading}
+              disabled={isLoading}
+              buttonStyle={[styles.navButton, { backgroundColor: colors.success }]}
+            />
           )}
-        </HStack>
-      </VStack>
-    </Box>
+        </View>
+      </Card>
+    </ScrollView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginVertical: 8,
+    padding: 16,
+  },
+  progressContainer: {
+    marginBottom: 24,
+  },
+  progressBar: {
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+  },
+  stepContent: {
+    paddingVertical: 16,
+  },
+  stepTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 24,
+  },
+  formGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  dateButton: {
+    borderWidth: 1,
+    borderRadius: 8,
+    justifyContent: 'flex-start',
+    paddingHorizontal: 12,
+  },
+  errorText: {
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 12,
+  },
+  reviewCard: {
+    borderRadius: 8,
+    padding: 16,
+  },
+  reviewItem: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  reviewLabel: {
+    fontWeight: '500',
+    marginRight: 8,
+    minWidth: 100,
+  },
+  reviewValue: {
+    flex: 1,
+  },
+  navigationButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 24,
+    gap: 12,
+  },
+  navButton: {
+    flex: 1,
+    borderRadius: 8,
+    paddingVertical: 12,
+  },
+});
 
 export default EventCreateFormMultiStep;

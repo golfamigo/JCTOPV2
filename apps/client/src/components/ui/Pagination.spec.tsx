@@ -1,6 +1,5 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ChakraProvider } from '@chakra-ui/react';
 import Pagination from './Pagination';
 
 // Helper function to render with ChakraProvider

@@ -1,28 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Container,
-  VStack,
-  HStack,
-  Heading,
-  Text,
-  Tab,
-  Tabs,
-  TabList,
-  TabPanels,
-  TabPanel,
-  Badge,
-  Alert,
-  AlertIcon,
-  Spinner,
-  Center,
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  Button,
-  useColorModeValue,
-} from '@chakra-ui/react';
-import { ChevronRightIcon } from '@chakra-ui/icons';
+import { View, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { Text, Card, Badge, Button, Tab, TabView, Icon } from '@rneui/themed';
+import { MaterialIcons } from '@expo/vector-icons';
 import { Event } from '@jctop-event/shared-types';
 import eventService from '../../../services/eventService';
 import DiscountCodeList from './DiscountCodeList';
@@ -30,6 +9,7 @@ import TicketConfiguration from './TicketConfiguration';
 import SeatingConfiguration from './SeatingConfiguration';
 import EventStatusManager from './EventStatusManager';
 import { useRouter } from 'expo-router';
+import { useAppTheme } from '../../../theme';
 
 interface EventManagementProps {
   eventId: string;
@@ -45,9 +25,7 @@ const EventManagement: React.FC<EventManagementProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const router = useRouter();
-
-  const bg = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const { colors } = useAppTheme();
 
   useEffect(() => {
     loadEvent();
@@ -70,15 +48,15 @@ const EventManagement: React.FC<EventManagementProps> = ({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'published':
-        return 'green';
+        return colors.success;
       case 'draft':
-        return 'yellow';
+        return colors.warning;
       case 'paused':
-        return 'orange';
+        return colors.warning;
       case 'ended':
-        return 'gray';
+        return colors.grey3;
       default:
-        return 'gray';
+        return colors.grey3;
     }
   };
 
@@ -94,214 +72,413 @@ const EventManagement: React.FC<EventManagementProps> = ({
 
   if (isLoading) {
     return (
-      <Center py={12}>
-        <VStack spacing={4}>
-          <Spinner size="lg" />
-          <Text>Loading event details...</Text>
-        </VStack>
-      </Center>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.grey2 }]}>
+          Loading event details...
+        </Text>
+      </View>
     );
   }
 
   if (error) {
     return (
-      <Container maxW="4xl" py={8}>
-        <Alert status="error">
-          <AlertIcon />
-          {error}
-        </Alert>
-      </Container>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.errorContainer, { 
+          backgroundColor: colors.error + '10',
+          borderColor: colors.error 
+        }]}>
+          <Icon
+            name="error"
+            type="material"
+            color={colors.error}
+            size={20}
+            containerStyle={styles.errorIcon}
+          />
+          <Text style={[styles.errorText, { color: colors.error }]}>
+            {error}
+          </Text>
+        </View>
+      </View>
     );
   }
 
   if (!event) {
     return (
-      <Container maxW="4xl" py={8}>
-        <Alert status="warning">
-          <AlertIcon />
-          Event not found
-        </Alert>
-      </Container>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.warningContainer, { 
+          backgroundColor: colors.warning + '10',
+          borderColor: colors.warning 
+        }]}>
+          <Icon
+            name="warning"
+            type="material"
+            color={colors.warning}
+            size={20}
+            containerStyle={styles.errorIcon}
+          />
+          <Text style={[styles.errorText, { color: colors.warning }]}>
+            Event not found
+          </Text>
+        </View>
+      </View>
     );
   }
 
   return (
-    <Container maxW="6xl" py={6}>
-      <VStack align="stretch" spacing={6}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView showsVerticalScrollIndicator={false}>
         {/* Breadcrumb */}
-        <Breadcrumb spacing="8px" separator={<ChevronRightIcon color="gray.500" />}>
-          <BreadcrumbItem>
-            <BreadcrumbLink onClick={onNavigateBack} cursor="pointer">
-              My Events
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbItem isCurrentPage>
-            <BreadcrumbLink>Event Management</BreadcrumbLink>
-          </BreadcrumbItem>
-        </Breadcrumb>
+        <View style={styles.breadcrumb}>
+          <Button
+            title="My Events"
+            type="clear"
+            titleStyle={[styles.breadcrumbLink, { color: colors.primary }]}
+            onPress={onNavigateBack}
+            icon={
+              <Icon
+                name="chevron-left"
+                type="material"
+                color={colors.primary}
+                size={20}
+              />
+            }
+          />
+          <Icon
+            name="chevron-right"
+            type="material"
+            color={colors.grey3}
+            size={20}
+          />
+          <Text style={[styles.breadcrumbCurrent, { color: colors.text }]}>
+            Event Management
+          </Text>
+        </View>
 
         {/* Event Header */}
-        <Box
-          p={6}
-          bg={bg}
-          borderWidth={1}
-          borderColor={borderColor}
-          borderRadius="lg"
-          shadow="sm"
-        >
-          <VStack align="stretch" spacing={4}>
-            <HStack justify="space-between" align="flex-start" wrap="wrap">
-              <VStack align="flex-start" spacing={2}>
-                <Heading size="lg">{event.title}</Heading>
-                <Text color="gray.600" fontSize="md">
-                  {event.description}
-                </Text>
-              </VStack>
-              
-              <Badge
-                colorScheme={getStatusColor(event.status)}
-                variant="subtle"
-                px={3}
-                py={1}
-                borderRadius="full"
-                textTransform="capitalize"
-              >
-                {event.status}
-              </Badge>
-            </HStack>
+        <Card containerStyle={[styles.headerCard, { backgroundColor: colors.card }]}>
+          <View style={styles.headerContent}>
+            <View style={styles.headerLeft}>
+              <Text h3 style={[styles.eventTitle, { color: colors.text }]}>
+                {event.title}
+              </Text>
+              <Text style={[styles.eventDescription, { color: colors.grey2 }]}>
+                {event.description}
+              </Text>
+            </View>
+            
+            <Badge
+              value={event.status}
+              badgeStyle={[styles.statusBadge, { backgroundColor: getStatusColor(event.status) }]}
+              textStyle={styles.statusBadgeText}
+            />
+          </View>
 
-            <HStack spacing={8} wrap="wrap">
-              <VStack align="flex-start" spacing={1}>
-                <Text fontSize="sm" color="gray.500" fontWeight="medium">
-                  Start Date
-                </Text>
-                <Text fontSize="sm" fontWeight="semibold">
-                  {formatDate(event.startDate)}
-                </Text>
-              </VStack>
-              
-              <VStack align="flex-start" spacing={1}>
-                <Text fontSize="sm" color="gray.500" fontWeight="medium">
-                  End Date
-                </Text>
-                <Text fontSize="sm" fontWeight="semibold">
-                  {formatDate(event.endDate)}
-                </Text>
-              </VStack>
-              
-              <VStack align="flex-start" spacing={1}>
-                <Text fontSize="sm" color="gray.500" fontWeight="medium">
-                  Location
-                </Text>
-                <Text fontSize="sm" fontWeight="semibold">
-                  {event.location}
-                </Text>
-              </VStack>
-            </HStack>
-          </VStack>
-        </Box>
+          <View style={styles.eventDetails}>
+            <View style={styles.detailItem}>
+              <Text style={[styles.detailLabel, { color: colors.grey2 }]}>
+                Start Date
+              </Text>
+              <Text style={[styles.detailValue, { color: colors.text }]}>
+                {formatDate(event.startDate)}
+              </Text>
+            </View>
+            
+            <View style={styles.detailItem}>
+              <Text style={[styles.detailLabel, { color: colors.grey2 }]}>
+                End Date
+              </Text>
+              <Text style={[styles.detailValue, { color: colors.text }]}>
+                {formatDate(event.endDate)}
+              </Text>
+            </View>
+            
+            <View style={styles.detailItem}>
+              <Text style={[styles.detailLabel, { color: colors.grey2 }]}>
+                Location
+              </Text>
+              <Text style={[styles.detailValue, { color: colors.text }]}>
+                {event.location}
+              </Text>
+            </View>
+          </View>
+        </Card>
 
         {/* Management Tabs */}
-        <Box
-          bg={bg}
-          borderWidth={1}
-          borderColor={borderColor}
-          borderRadius="lg"
-          overflow="hidden"
-        >
-          <Tabs index={activeTab} onChange={setActiveTab} variant="enclosed">
-            <TabList>
-              <Tab>Event Status</Tab>
-              <Tab>Attendees</Tab>
-              <Tab>Discount Codes</Tab>
-              <Tab>Tickets</Tab>
-              <Tab>Seating</Tab>
-            </TabList>
+        <View style={styles.tabContainer}>
+          <Tab
+            value={activeTab}
+            onChange={setActiveTab}
+            indicatorStyle={{ backgroundColor: colors.primary }}
+            variant="default"
+          >
+            <Tab.Item 
+              title="Status" 
+              titleStyle={[styles.tabTitle, { color: activeTab === 0 ? colors.primary : colors.grey2 }]}
+            />
+            <Tab.Item 
+              title="Attendees" 
+              titleStyle={[styles.tabTitle, { color: activeTab === 1 ? colors.primary : colors.grey2 }]}
+            />
+            <Tab.Item 
+              title="Discounts" 
+              titleStyle={[styles.tabTitle, { color: activeTab === 2 ? colors.primary : colors.grey2 }]}
+            />
+            <Tab.Item 
+              title="Tickets" 
+              titleStyle={[styles.tabTitle, { color: activeTab === 3 ? colors.primary : colors.grey2 }]}
+            />
+            <Tab.Item 
+              title="Seating" 
+              titleStyle={[styles.tabTitle, { color: activeTab === 4 ? colors.primary : colors.grey2 }]}
+            />
+          </Tab>
 
-            <TabPanels>
-              {/* Event Status Tab */}
-              <TabPanel>
-                <EventStatusManager
-                  eventId={eventId}
-                  currentStatus={event.status}
-                  onStatusChanged={(newStatus) => {
-                    setEvent(prev => prev ? { ...prev, status: newStatus } : null);
-                  }}
-                />
-              </TabPanel>
+          <TabView value={activeTab} onChange={setActiveTab} animationType="spring">
+            {/* Event Status Tab */}
+            <TabView.Item style={styles.tabContent}>
+              <EventStatusManager
+                eventId={eventId}
+                currentStatus={event.status}
+                onStatusChanged={(newStatus) => {
+                  setEvent(prev => prev ? { ...prev, status: newStatus } : null);
+                }}
+              />
+            </TabView.Item>
 
-              {/* Attendees Tab */}
-              <TabPanel>
-                <VStack align="stretch" spacing={4}>
-                  <HStack justify="space-between" align="center">
-                    <VStack align="flex-start" spacing={1}>
-                      <Heading size="md">Attendee Management</Heading>
-                      <Text color="gray.600">
-                        View and manage event attendees, track registrations, and export attendee lists.
-                      </Text>
-                    </VStack>
-                    <Button
-                      colorScheme="blue"
-                      onClick={() => router.push(`/organizer/events/${eventId}/attendees`)}
-                    >
-                      Manage Attendees
-                    </Button>
-                  </HStack>
+            {/* Attendees Tab */}
+            <TabView.Item style={styles.tabContent}>
+              <Card containerStyle={[styles.tabCard, { backgroundColor: colors.card }]}>
+                <View style={styles.attendeesContent}>
+                  <View style={styles.attendeesHeader}>
+                    <Text h4 style={[styles.sectionTitle, { color: colors.text }]}>
+                      Attendee Management
+                    </Text>
+                    <Text style={[styles.sectionDescription, { color: colors.grey2 }]}>
+                      View and manage event attendees, track registrations, and export attendee lists.
+                    </Text>
+                  </View>
                   
-                  <Box p={4} bg="gray.50" borderRadius="md">
-                    <Text fontSize="sm" color="gray.600">
+                  <Button
+                    title="Manage Attendees"
+                    onPress={() => router.push(`/organizer/events/${eventId}/attendees`)}
+                    buttonStyle={[styles.actionButton, { backgroundColor: colors.primary }]}
+                    icon={
+                      <Icon
+                        name="people"
+                        type="material"
+                        color={colors.white}
+                        size={20}
+                        containerStyle={{ marginRight: 8 }}
+                      />
+                    }
+                  />
+                  
+                  <View style={[styles.infoBox, { backgroundColor: colors.grey5 }]}>
+                    <Text style={[styles.infoText, { color: colors.grey2 }]}>
                       Access detailed attendee information including contact details, payment status, 
                       registration dates, and custom field responses. Export attendee lists to CSV or Excel 
                       for external use.
                     </Text>
-                  </Box>
-                </VStack>
-              </TabPanel>
+                  </View>
+                </View>
+              </Card>
+            </TabView.Item>
 
-              {/* Discount Codes Tab */}
-              <TabPanel>
-                <DiscountCodeList eventId={eventId} />
-              </TabPanel>
+            {/* Discount Codes Tab */}
+            <TabView.Item style={styles.tabContent}>
+              <DiscountCodeList eventId={eventId} />
+            </TabView.Item>
 
-              {/* Tickets Tab */}
-              <TabPanel>
-                <VStack align="stretch" spacing={4}>
-                  <Heading size="md">Ticket Configuration</Heading>
-                  <Text color="gray.600">
-                    Configure ticket types and pricing for your event.
-                  </Text>
-                  <TicketConfiguration
-                    ticketTypes={[]} // TODO: Load actual ticket types
-                    onChange={(ticketTypes) => {
-                      console.log('Ticket types updated:', ticketTypes);
-                      // TODO: Implement ticket type updates
-                    }}
-                  />
-                </VStack>
-              </TabPanel>
+            {/* Tickets Tab */}
+            <TabView.Item style={styles.tabContent}>
+              <Card containerStyle={[styles.tabCard, { backgroundColor: colors.card }]}>
+                <Text h4 style={[styles.sectionTitle, { color: colors.text }]}>
+                  Ticket Configuration
+                </Text>
+                <Text style={[styles.sectionDescription, { color: colors.grey2 }]}>
+                  Configure ticket types and pricing for your event.
+                </Text>
+                <TicketConfiguration
+                  ticketTypes={[]} // TODO: Load actual ticket types
+                  onChange={(ticketTypes) => {
+                    console.log('Ticket types updated:', ticketTypes);
+                    // TODO: Implement ticket type updates
+                  }}
+                />
+              </Card>
+            </TabView.Item>
 
-              {/* Seating Tab */}
-              <TabPanel>
-                <VStack align="stretch" spacing={4}>
-                  <Heading size="md">Seating Configuration</Heading>
-                  <Text color="gray.600">
-                    Configure seating zones and capacity for your event.
-                  </Text>
-                  <SeatingConfiguration
-                    seatingZones={[]} // TODO: Load actual seating zones
-                    onChange={(seatingZones) => {
-                      console.log('Seating zones updated:', seatingZones);
-                      // TODO: Implement seating zone updates
-                    }}
-                  />
-                </VStack>
-              </TabPanel>
-            </TabPanels>
-          </Tabs>
-        </Box>
-      </VStack>
-    </Container>
+            {/* Seating Tab */}
+            <TabView.Item style={styles.tabContent}>
+              <Card containerStyle={[styles.tabCard, { backgroundColor: colors.card }]}>
+                <Text h4 style={[styles.sectionTitle, { color: colors.text }]}>
+                  Seating Configuration
+                </Text>
+                <Text style={[styles.sectionDescription, { color: colors.grey2 }]}>
+                  Configure seating zones and capacity for your event.
+                </Text>
+                <SeatingConfiguration
+                  seatingZones={[]} // TODO: Load actual seating zones
+                  onChange={(seatingZones) => {
+                    console.log('Seating zones updated:', seatingZones);
+                    // TODO: Implement seating zone updates
+                  }}
+                />
+              </Card>
+            </TabView.Item>
+          </TabView>
+        </View>
+      </ScrollView>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    margin: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  warningContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    margin: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  errorIcon: {
+    marginRight: 8,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+  },
+  breadcrumb: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  breadcrumbLink: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  breadcrumbCurrent: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  headerCard: {
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  headerLeft: {
+    flex: 1,
+    marginRight: 16,
+  },
+  eventTitle: {
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  eventDescription: {
+    fontSize: 14,
+  },
+  statusBadge: {
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  statusBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  eventDetails: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 24,
+  },
+  detailItem: {
+    minWidth: 100,
+  },
+  detailLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  tabContainer: {
+    marginTop: 16,
+  },
+  tabTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  tabContent: {
+    minHeight: 400,
+  },
+  tabCard: {
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 12,
+  },
+  sectionTitle: {
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  sectionDescription: {
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  attendeesContent: {
+    gap: 16,
+  },
+  attendeesHeader: {
+    marginBottom: 8,
+  },
+  actionButton: {
+    borderRadius: 8,
+    paddingVertical: 12,
+  },
+  infoBox: {
+    padding: 12,
+    borderRadius: 8,
+  },
+  infoText: {
+    fontSize: 13,
+    lineHeight: 20,
+  },
+});
 
 export default EventManagement;

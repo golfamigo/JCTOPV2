@@ -1,29 +1,40 @@
 import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, Platform } from 'react-native';
 import {
-  Box,
-  VStack,
-  HStack,
   Text,
   Input,
   Button,
-  FormControl,
-  FormLabel,
-  FormErrorMessage,
-  Alert,
-  AlertIcon,
-  AlertTitle,
-  AlertDescription,
-  useColorModeValue,
-  Divider,
-  Flex,
+  Card,
+  Avatar,
   Badge,
-} from '@chakra-ui/react';
+  Divider,
+} from '@rneui/themed';
 import { useAuthStore } from '../../../stores/authStore';
+import { useAppTheme } from '@/theme';
+import { useTranslation } from '../../../localization';
+import { LoadingOverlay, FullScreenLoading } from '../../organisms/LoadingOverlay';
+import { ErrorCard } from '../../molecules/ErrorCard';
+import { useNetworkStatus } from '../../../utils/networkStatus';
 
 interface UpdateProfileData {
   name?: string;
   phone?: string;
 }
+
+// Validation constants for better maintainability
+const VALIDATION_RULES = {
+  NAME_MIN_LENGTH: 2,
+  NAME_MAX_LENGTH: 50,
+  PHONE_REGEX: /^\+?[\d\s\-\(\)]{8,20}$/,
+} as const;
+
+// UI constants
+const UI_CONSTANTS = {
+  AVATAR_SIZE: 80,
+  MIN_BUTTON_WIDTH: 80,
+  SHADOW_ELEVATION: 3,
+  OPACITY_SUFFIX: '20', // For transparent backgrounds
+} as const;
 
 const ProfilePage = () => {
   const { user, getProfile, updateProfile } = useAuthStore();
@@ -36,14 +47,9 @@ const ProfilePage = () => {
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [updateSuccess, setUpdateSuccess] = useState<string | null>(null);
 
-  // Design system colors following branding guide
-  const bgColor = useColorModeValue('#F8FAFC', '#0F172A'); // Neutral backgrounds
-  const cardBgColor = useColorModeValue('white', '#1E293B');
-  const primaryColor = '#2563EB'; // Primary from branding guide
-  const secondaryColor = '#475569'; // Secondary from branding guide
-  const errorColor = '#EF4444'; // Error from branding guide
-  const successColor = '#10B981'; // Success from branding guide
-  const neutralColor = '#64748B'; // Neutral text from branding guide
+  const { colors, spacing, typography } = useAppTheme();
+  const { t } = useTranslation();
+  const networkStatus = useNetworkStatus();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -71,18 +77,21 @@ const ProfilePage = () => {
 
   const validateForm = (): boolean => {
     const newErrors: Partial<UpdateProfileData> = {};
+    const trimmedName = name?.trim() || '';
+    const trimmedPhone = phone?.trim() || '';
 
-    if (name && name.trim().length < 2) {
-      newErrors.name = 'Name must be at least 2 characters long';
-    } else if (name && name.trim().length > 50) {
-      newErrors.name = 'Name must not exceed 50 characters';
+    // Name validation
+    if (trimmedName.length > 0) {
+      if (trimmedName.length < VALIDATION_RULES.NAME_MIN_LENGTH) {
+        newErrors.name = t('validation.minLength', { count: VALIDATION_RULES.NAME_MIN_LENGTH });
+      } else if (trimmedName.length > VALIDATION_RULES.NAME_MAX_LENGTH) {
+        newErrors.name = t('validation.maxLength', { count: VALIDATION_RULES.NAME_MAX_LENGTH });
+      }
     }
 
-    if (phone && phone.trim().length > 0) {
-      const phoneRegex = /^\+?[\d\s\-\(\)]{8,20}$/;
-      if (!phoneRegex.test(phone.trim())) {
-        newErrors.phone = 'Phone number must be a valid international format';
-      }
+    // Phone validation
+    if (trimmedPhone.length > 0 && !VALIDATION_RULES.PHONE_REGEX.test(trimmedPhone)) {
+      newErrors.phone = t('validation.invalidPhoneNumber');
     }
 
     setErrors(newErrors);
@@ -112,340 +121,318 @@ const ProfilePage = () => {
       return;
     }
 
+    if (!networkStatus.isConnected) {
+      setUpdateError(t('errors.offline'));
+      return;
+    }
+
     setIsLoading(true);
     setUpdateError(null);
     setUpdateSuccess(null);
 
     try {
       const updateData: UpdateProfileData = {};
+      const trimmedName = name?.trim() || '';
+      const trimmedPhone = phone?.trim() || '';
       
-      if (name.trim() !== user?.name) {
-        updateData.name = name.trim();
+      // Only include changed fields in update
+      if (trimmedName !== (user?.name || '')) {
+        updateData.name = trimmedName || undefined;
       }
       
-      if (phone.trim() !== (user?.phone || '')) {
-        updateData.phone = phone.trim() || undefined;
+      if (trimmedPhone !== (user?.phone || '')) {
+        updateData.phone = trimmedPhone || undefined;
       }
 
       if (Object.keys(updateData).length > 0) {
         await updateProfile(updateData);
-        setUpdateSuccess('Profile updated successfully!');
+        setUpdateSuccess(t('profile.profileUpdated'));
         setIsEditing(false);
       } else {
+        // No changes detected, just exit edit mode
         setIsEditing(false);
       }
     } catch (error) {
-      setUpdateError(error instanceof Error ? error.message : 'Failed to update profile');
+      setUpdateError(error instanceof Error ? error.message : t('messages.somethingWentWrong'));
     } finally {
       setIsLoading(false);
     }
   };
 
   const formatDate = (date: Date | string) => {
-    return new Date(date).toLocaleDateString('en-US', {
+    return new Date(date).toLocaleDateString('zh-TW', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.lg,
+    },
+    scrollContent: {
+      paddingVertical: spacing.lg,
+    },
+    centerContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    card: {
+      marginHorizontal: 0,
+      borderRadius: spacing.sm,
+      elevation: UI_CONSTANTS.SHADOW_ELEVATION,
+      shadowColor: colors.dark,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.lg,
+      flexWrap: 'wrap',
+    },
+    title: {
+      ...typography.h1,
+      marginBottom: spacing.xs,
+    },
+    avatarContainer: {
+      alignItems: 'center',
+      marginBottom: spacing.lg,
+    },
+    formField: {
+      marginBottom: spacing.md,
+    },
+    fieldLabel: {
+      fontSize: 16,
+      fontWeight: '600',
+      marginBottom: spacing.xs,
+    },
+    readOnlyField: {
+      backgroundColor: colors.lightGrey,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: spacing.xs,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      minHeight: 48,
+      justifyContent: 'center',
+    },
+    readOnlyText: {
+      ...typography.body,
+      color: colors.text,
+    },
+    emailContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    emailField: {
+      flex: 1,
+    },
+    sectionTitle: {
+      ...typography.h2,
+      fontSize: 18,
+      marginTop: spacing.lg,
+      marginBottom: spacing.md,
+    },
+    infoRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: spacing.sm,
+    },
+    infoLabel: {
+      ...typography.body,
+      color: colors.textSecondary,
+      flex: 1,
+    },
+    infoValue: {
+      ...typography.body,
+      color: colors.text,
+      fontWeight: '500',
+    },
+    buttonContainer: {
+      flexDirection: 'row',
+      marginTop: spacing.lg,
+      gap: spacing.md,
+    },
+    button: {
+      flex: 1,
+      borderRadius: spacing.sm,
+    },
+    alertCard: {
+      marginBottom: spacing.md,
+    },
+    alertTitle: {
+      fontWeight: '600',
+      marginBottom: spacing.xs,
+    },
+  });
+
   if (isFetching) {
-    return (
-      <Box
-        minH="100vh"
-        bg={bgColor}
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        px={4}
-      >
-        <Text>Loading profile...</Text>
-      </Box>
-    );
+    return <FullScreenLoading visible={true} />;
   }
 
   if (!user) {
     return (
-      <Box
-        minH="100vh"
-        bg={bgColor}
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        px={4}
-      >
-        <Text>Unable to load profile</Text>
-      </Box>
+      <View style={styles.centerContainer}>
+        <ErrorCard
+          message={t('messages.somethingWentWrong')}
+          errorType="generic"
+          containerStyle={{ width: '90%' }}
+        />
+      </View>
     );
   }
 
   return (
-    <Box
-      minH="100vh"
-      bg={bgColor}
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
-      px={4}
-      py={8}
-    >
-      <Box
-        maxW={{ base: "100%", md: "500px" }}
-        w="100%"
-        bg={cardBgColor}
-        p={{ base: 6, md: 8 }}
-        borderRadius="md"
-        boxShadow="lg"
-        border="1px"
-        borderColor="#E2E8F0"
-        mx={{ base: 4, md: 0 }}
-      >
-        <VStack spacing={8}>
-          {/* Header */}
-          <Flex w="100%" justify="space-between" align="center" direction={{ base: "column", sm: "row" }} gap={4}>
-            <Text
-              fontSize={{ base: "30px", md: "36px" }}
-              fontWeight="700"
-              color="gray.900"
-              fontFamily="Inter"
-              lineHeight={1.2}
-            >
-              Profile
-            </Text>
-            {!isEditing && (
-              <Button
-                onClick={handleEdit}
-                variant="outline"
-                colorScheme="blue"
-                size="sm"
-                bg="white"
-                borderColor={primaryColor}
-                color={primaryColor}
-                _hover={{ bg: primaryColor, color: "white" }}
-              >
-                Edit
-              </Button>
-            )}
-          </Flex>
-
-          {/* Success Alert */}
-          {updateSuccess && (
-            <Alert status="success" borderRadius="md">
-              <AlertIcon />
-              <Box>
-                <AlertTitle>Success!</AlertTitle>
-                <AlertDescription>{updateSuccess}</AlertDescription>
-              </Box>
-            </Alert>
+    <>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      <Card containerStyle={styles.card}>
+        {/* Header with Avatar */}
+        <View style={styles.header}>
+          <Text style={styles.title}>{t('profile.profile')}</Text>
+          {!isEditing && (
+            <Button
+              title={t('common.edit')}
+              onPress={handleEdit}
+              type="outline"
+              buttonStyle={[styles.button, { flex: 0, minWidth: UI_CONSTANTS.MIN_BUTTON_WIDTH }]}
+            />
           )}
+        </View>
 
-          {/* Error Alert */}
-          {updateError && (
-            <Alert status="error" borderRadius="md">
-              <AlertIcon />
-              <Box>
-                <AlertTitle>Update Failed!</AlertTitle>
-                <AlertDescription>{updateError}</AlertDescription>
-              </Box>
-            </Alert>
-          )}
+        {/* Avatar */}
+        <View style={styles.avatarContainer}>
+          <Avatar
+            size={UI_CONSTANTS.AVATAR_SIZE}
+            rounded
+            title={user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+            containerStyle={{ backgroundColor: colors.primary }}
+          />
+        </View>
 
-          {/* User Information */}
-          <VStack spacing={4} w="100%">
-            {/* Name Field */}
-            <FormControl isInvalid={!!errors.name}>
-              <FormLabel
-                fontSize="16px"
-                fontWeight="400"
-                color={secondaryColor}
-                fontFamily="Inter"
-                lineHeight={1.5}
-              >
-                Full Name
-              </FormLabel>
-              {isEditing ? (
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter your full name"
-                  size="lg"
-                  borderColor={errors.name ? errorColor : '#E2E8F0'}
-                  _hover={{ borderColor: errors.name ? errorColor : secondaryColor }}
-                  _focus={{ 
-                    borderColor: errors.name ? errorColor : primaryColor, 
-                    boxShadow: `0 0 0 1px ${errors.name ? errorColor : primaryColor}` 
-                  }}
-                  fontFamily="Inter"
-                  fontSize="16px"
-                />
-              ) : (
-                <Text
-                  fontSize="16px"
-                  color="gray.900"
-                  p={3}
-                  bg="#F8FAFC"
-                  borderRadius="md"
-                  border="1px"
-                  borderColor="#E2E8F0"
-                  fontFamily="Inter"
-                  lineHeight={1.5}
-                >
-                  {user.name}
-                </Text>
-              )}
-              <FormErrorMessage color={errorColor}>
-                {errors.name}
-              </FormErrorMessage>
-            </FormControl>
+        {/* Success Alert */}
+        {updateSuccess && (
+          <Card containerStyle={[styles.alertCard, { backgroundColor: colors.success + UI_CONSTANTS.OPACITY_SUFFIX, borderColor: colors.success }]}>
+            <Text style={[styles.alertTitle, { color: colors.success }]}>{t('common.success')}</Text>
+            <Text style={{ color: colors.success }}>{updateSuccess}</Text>
+          </Card>
+        )}
 
-            {/* Email Field (Read-only) */}
-            <FormControl>
-              <FormLabel
-                fontSize="16px"
-                fontWeight="600"
-                color="gray.700"
-                fontFamily="Inter"
-              >
-                Email Address
-              </FormLabel>
-              <HStack>
-                <Text
-                  fontSize="16px"
-                  color="gray.900"
-                  p={3}
-                  bg="#F8FAFC"
-                  borderRadius="md"
-                  border="1px"
-                  borderColor="#E2E8F0"
-                  fontFamily="Inter"
-                  lineHeight={1.5}
-                  flex={1}
-                >
-                  {user.email}
-                </Text>
-                <Badge colorScheme="gray" fontSize="xs">
-                  Cannot be changed
-                </Badge>
-              </HStack>
-            </FormControl>
+        {/* Error Alert */}
+        {updateError && (
+          <ErrorCard
+            message={updateError}
+            errorType={!networkStatus.isConnected ? 'network' : 'generic'}
+            onDismiss={() => setUpdateError(null)}
+            containerStyle={{ marginBottom: spacing.md }}
+          />
+        )}
 
-            {/* Phone Field */}
-            <FormControl isInvalid={!!errors.phone}>
-              <FormLabel
-                fontSize="16px"
-                fontWeight="600"
-                color="gray.700"
-                fontFamily="Inter"
-              >
-                Phone Number
-              </FormLabel>
-              {isEditing ? (
-                <Input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="Enter your phone number (e.g., +1234567890)"
-                  size="lg"
-                  borderColor={errors.phone ? errorColor : '#E2E8F0'}
-                  _hover={{ borderColor: errors.phone ? errorColor : secondaryColor }}
-                  _focus={{ 
-                    borderColor: errors.phone ? errorColor : primaryColor, 
-                    boxShadow: `0 0 0 1px ${errors.phone ? errorColor : primaryColor}` 
-                  }}
-                  fontFamily="Inter"
-                  fontSize="16px"
-                />
-              ) : (
-                <Text
-                  fontSize="16px"
-                  color="gray.900"
-                  p={3}
-                  bg="#F8FAFC"
-                  borderRadius="md"
-                  border="1px"
-                  borderColor="#E2E8F0"
-                  fontFamily="Inter"
-                  lineHeight={1.5}
-                >
-                  {user.phone || 'Not provided'}
-                </Text>
-              )}
-              <FormErrorMessage color={errorColor}>
-                {errors.phone}
-              </FormErrorMessage>
-            </FormControl>
+        {/* Name Field */}
+        <View style={styles.formField}>
+          <Input
+            label={t('auth.name')}
+            value={name}
+            onChangeText={setName}
+            placeholder={t('auth.enterName')}
+            disabled={!isEditing}
+            errorMessage={errors.name}
+            renderErrorMessage={!!errors.name}
+            inputStyle={!isEditing ? { color: colors.textSecondary } : undefined}
+            inputContainerStyle={!isEditing ? { backgroundColor: colors.lightGrey } : undefined}
+          />
+        </View>
 
-            <Divider />
+        {/* Email Field (Read-only) */}
+        <View style={styles.formField}>
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+            {t('auth.email')}
+          </Text>
+          <View style={styles.emailContainer}>
+            <View style={[styles.readOnlyField, styles.emailField]}>
+              <Text style={styles.readOnlyText}>{user.email}</Text>
+            </View>
+            <Badge
+              value={t('profile.cannotBeChanged') || 'Cannot be changed'}
+              status="primary"
+              badgeStyle={{ backgroundColor: colors.midGrey }}
+            />
+          </View>
+        </View>
 
-            {/* Account Information */}
-            <VStack spacing={3} w="100%" align="start">
-              <Text
-                fontSize="18px"
-                fontWeight="600"
-                color="gray.700"
-                fontFamily="Inter"
-              >
-                Account Information
-              </Text>
-              
-              <HStack w="100%" justify="space-between">
-                <Text color={neutralColor} fontSize="16px" fontFamily="Inter" lineHeight={1.5}>Authentication Provider:</Text>
-                <Badge colorScheme="blue" textTransform="capitalize">
-                  {user.authProvider}
-                </Badge>
-              </HStack>
-              
-              <HStack w="100%" justify="space-between">
-                <Text color={neutralColor} fontSize="16px" fontFamily="Inter" lineHeight={1.5}>Member Since:</Text>
-                <Text color="gray.900" fontWeight="400" fontSize="16px" fontFamily="Inter" lineHeight={1.5}>
-                  {formatDate(user.createdAt)}
-                </Text>
-              </HStack>
-              
-              <HStack w="100%" justify="space-between">
-                <Text color={neutralColor} fontSize="16px" fontFamily="Inter" lineHeight={1.5}>Last Updated:</Text>
-                <Text color="gray.900" fontWeight="400" fontSize="16px" fontFamily="Inter" lineHeight={1.5}>
-                  {formatDate(user.updatedAt)}
-                </Text>
-              </HStack>
-            </VStack>
-          </VStack>
+        {/* Phone Field */}
+        <View style={styles.formField}>
+          <Input
+            label={t('auth.phone')}
+            value={phone}
+            onChangeText={setPhone}
+            placeholder={phone || t('profile.notProvided') || 'Not provided'}
+            disabled={!isEditing}
+            errorMessage={errors.phone}
+            renderErrorMessage={!!errors.phone}
+            inputStyle={!isEditing ? { color: colors.textSecondary } : undefined}
+            inputContainerStyle={!isEditing ? { backgroundColor: colors.lightGrey } : undefined}
+          />
+        </View>
 
-          {/* Action Buttons */}
-          {isEditing && (
-            <HStack spacing={4} w="100%" direction={{ base: "column", sm: "row" }}>
-              <Button
-                onClick={handleCancel}
-                variant="outline"
-                size="lg"
-                flex={1}
-                borderColor={secondaryColor}
-                color={secondaryColor}
-                _hover={{ bg: secondaryColor, color: "white" }}
-                fontFamily="Inter"
-                fontWeight="600"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSave}
-                isLoading={isLoading}
-                loadingText="Saving..."
-                bg={primaryColor}
-                color="white"
-                size="lg"
-                flex={1}
-                _hover={{ bg: '#1D4ED8' }}
-                _active={{ bg: '#1E40AF' }}
-                fontFamily="Inter"
-                fontWeight="600"
-              >
-                Save Changes
-              </Button>
-            </HStack>
-          )}
-        </VStack>
-      </Box>
-    </Box>
+        <Divider style={{ marginVertical: spacing.lg }} />
+
+        {/* Account Information */}
+        <Text style={styles.sectionTitle}>{t('profile.accountInformation') || 'Account Information'}</Text>
+        
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>{t('profile.authProvider') || 'Authentication Provider'}:</Text>
+          <Badge
+            value={user.authProvider}
+            status="primary"
+            badgeStyle={{ backgroundColor: colors.primary }}
+          />
+        </View>
+        
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>{t('profile.memberSince') || 'Member Since'}:</Text>
+          <Text style={styles.infoValue}>{formatDate(user.createdAt)}</Text>
+        </View>
+        
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>{t('profile.lastUpdated') || 'Last Updated'}:</Text>
+          <Text style={styles.infoValue}>{formatDate(user.updatedAt)}</Text>
+        </View>
+
+        {/* Action Buttons */}
+        {isEditing && (
+          <View style={styles.buttonContainer}>
+            <Button
+              title={t('common.cancel')}
+              onPress={handleCancel}
+              type="outline"
+              buttonStyle={styles.button}
+            />
+            <Button
+              title={t('common.save')}
+              onPress={handleSave}
+              loading={isLoading}
+              buttonStyle={[styles.button, { backgroundColor: colors.primary }]}
+            />
+          </View>
+        )}
+      </Card>
+    </ScrollView>
+    <LoadingOverlay
+      visible={isLoading}
+      message={t('loading.updating')}
+      variant="spinner"
+    />
+    </>
   );
 };
 

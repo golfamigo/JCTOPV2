@@ -21,11 +21,7 @@ jest.mock('../stores/authStore', () => ({
   useAuthStore: jest.fn(),
 }));
 
-// Mock Chakra UI
-jest.mock('@chakra-ui/react', () => ({
-  ChakraProvider: ({ children }: any) => children,
-  useColorModeValue: jest.fn().mockReturnValue('dark'),
-}));
+// Mock Chakra UI (removed since we're not using ChakraUI anymore)
 
 // Mock components
 jest.mock('../components/features/auth/LoginForm', () => {
