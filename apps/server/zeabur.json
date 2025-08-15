@@ -1,0 +1,10 @@
+{
+  "name": "jctop-backend",
+  "build_command": "npm run build",
+  "start_command": "npm run start:prod",
+  "environment": {
+    "NODE_VERSION": "18",
+    "NODE_ENV": "production"
+  },
+  "port": 3000
+}
