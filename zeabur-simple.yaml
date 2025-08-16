@@ -1,0 +1,26 @@
+apiVersion: zeabur.com/v1
+kind: Template
+metadata:
+    name: JCTOP
+spec:
+    description: Event management system
+    icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/nestjs.svg
+    tags:
+        - Tool
+    services:
+        - name: database
+          template: POSTGRESQL
+          
+        - name: backend
+          template: GIT
+          spec:
+            env:
+                DATABASE_URL:
+                    default: ${database.POSTGRES_CONNECTION_STRING}
+                    
+        - name: frontend
+          template: GIT
+          spec:
+            env:
+                EXPO_PUBLIC_API_URL:
+                    default: https://${backend.ZEABUR_WEB_URL}/api/v1

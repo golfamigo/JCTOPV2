@@ -57,32 +57,18 @@ spec:
                 - id: data
                   dir: /var/lib/postgresql/data
             env:
-                PGDATA:
-                    default: /var/lib/postgresql/data/pgdata
-                POSTGRES_CONNECTION_STRING:
-                    default: postgresql://${POSTGRES_USERNAME}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DATABASE}
-                    expose: true
-                POSTGRES_DATABASE:
-                    default: ${POSTGRES_DB}
-                    expose: true
                 POSTGRES_DB:
                     default: jctop
+                POSTGRES_USER:
+                    default: jctop
+                POSTGRES_PASSWORD:
+                    generate: PASSWORD
+                    expose: true
                 POSTGRES_HOST:
                     default: ${CONTAINER_HOSTNAME}
                     expose: true
-                POSTGRES_PASSWORD:
-                    default: ${PASSWORD}
-                    expose: true
                 POSTGRES_PORT:
                     default: ${DATABASE_PORT}
-                    expose: true
-                POSTGRES_URI:
-                    default: ${POSTGRES_CONNECTION_STRING}
-                    expose: true
-                POSTGRES_USER:
-                    default: root
-                POSTGRES_USERNAME:
-                    default: ${POSTGRES_USER}
                     expose: true
             healthCheck:
                 type: TCP
@@ -106,13 +92,17 @@ spec:
                 NODE_ENV:
                     default: production
                 DATABASE_URL:
-                    default: ${POSTGRES_CONNECTION_STRING}
+                    default: postgresql://${postgresql.POSTGRES_USER}:${postgresql.POSTGRES_PASSWORD}@${postgresql.POSTGRES_HOST}:${postgresql.POSTGRES_PORT}/${postgresql.POSTGRES_DB}
                 JWT_SECRET:
-                    default: ${PASSWORD}
+                    generate: PASSWORD
                 ENCRYPTION_SECRET_KEY:
                     default: abcdefghijklmnopqrstuvwxyz123456
                 CORS_ORIGIN:
-                    default: https://${PUBLIC_DOMAIN}
+                    default: https://${ZEABUR_WEB_DOMAIN}
+                    expose: true
+                BACKEND_URL:
+                    default: https://${ZEABUR_WEB_URL}
+                    expose: true
                 GOOGLE_CLIENT_ID:
                     default: ""
                 GOOGLE_CLIENT_SECRET:
@@ -140,7 +130,7 @@ spec:
                   type: HTTP
             env:
                 EXPO_PUBLIC_API_URL:
-                    default: https://${ZEABUR_WEB_DOMAIN}/api/v1
+                    default: ${backend.BACKEND_URL}/api/v1
             healthCheck:
                 type: HTTP
                 port: web

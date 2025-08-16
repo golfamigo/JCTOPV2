@@ -1,0 +1,105 @@
+apiVersion: zeabur.com/v1
+kind: Template
+metadata:
+    name: JCTOP Event Management
+spec:
+    description: Complete event management system with PostgreSQL, NestJS backend, and Expo frontend
+    icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/nestjs.svg
+    coverImage: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/nestjs.svg
+    variables:
+        - key: PUBLIC_DOMAIN
+          type: DOMAIN
+          name: Frontend Domain
+          description: Domain for your frontend application
+        - key: API_DOMAIN
+          type: DOMAIN
+          name: Backend API Domain
+          description: Domain for your backend API
+        - key: DB_PASSWORD
+          type: STRING
+          name: Database Password
+          description: PostgreSQL database password
+    tags:
+        - Tool
+        - NestJS
+        - PostgreSQL
+        - React
+    readme: |-
+        # JCTOP Event Management System
+        
+        A complete event management platform with:
+        - PostgreSQL Database
+        - NestJS Backend API
+        - Expo Web Frontend
+        
+        ## Features
+        - Event creation and management
+        - Ticket sales and registration
+        - QR code check-in
+        - Analytics dashboard
+        
+        ## Setup
+        After deployment, bind domains to your frontend and backend services.
+    services:
+        - name: jctop-db
+          icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/postgresql.svg
+          template: PREBUILT
+          spec:
+            source:
+                image: postgres:16-alpine
+            ports:
+                - id: postgres
+                  port: 5432
+                  type: TCP
+            volumes:
+                - id: pgdata
+                  dir: /var/lib/postgresql/data
+            env:
+                POSTGRES_DB:
+                    default: jctop
+                POSTGRES_USER:
+                    default: jctop
+                POSTGRES_PASSWORD:
+                    default: ${DB_PASSWORD}
+                    
+        - name: jctop-api
+          icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/nestjs.svg
+          template: PREBUILT
+          domainKey: API_DOMAIN
+          dependencies:
+            - jctop-db
+          spec:
+            source:
+                image: ghcr.io/golfamigo/jctopv2-backend:latest
+            ports:
+                - id: api
+                  port: 3000
+                  type: HTTP
+            env:
+                NODE_ENV:
+                    default: production
+                DATABASE_URL:
+                    default: postgresql://jctop:${DB_PASSWORD}@jctop-db:5432/jctop
+                JWT_SECRET:
+                    generate: PASSWORD
+                ENCRYPTION_SECRET_KEY:
+                    default: abcdefghijklmnopqrstuvwxyz123456
+                CORS_ORIGIN:
+                    default: https://${PUBLIC_DOMAIN}
+                    
+        - name: jctop-web
+          icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/react.svg
+          template: PREBUILT
+          domainKey: PUBLIC_DOMAIN
+          dependencies:
+            - jctop-api
+          spec:
+            source:
+                image: ghcr.io/golfamigo/jctopv2-frontend:latest
+            ports:
+                - id: web
+                  port: 80
+                  type: HTTP
+            env:
+                EXPO_PUBLIC_API_URL:
+                    default: https://${API_DOMAIN}/api/v1
