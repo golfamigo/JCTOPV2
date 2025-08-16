@@ -1,0 +1,107 @@
+# yaml-language-server: $schema=https://schema.zeabur.app/template.json
+apiVersion: zeabur.com/v1
+kind: Template
+metadata:
+    name: JCTOP Event System
+spec:
+    description: Event management system with NestJS backend and Expo web frontend
+    icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/nestjs.svg
+    coverImage: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/nestjs.svg
+    variables:
+        - key: PUBLIC_DOMAIN
+          type: DOMAIN
+          name: Frontend Domain
+          description: Domain for your JCTOP frontend application
+        - key: API_DOMAIN
+          type: DOMAIN
+          name: API Domain  
+          description: Domain for your JCTOP backend API
+    tags:
+        - NestJS
+        - React
+        - PostgreSQL
+        - Tool
+    readme: |
+        # JCTOP Event Management System
+        
+        A complete event management platform with modern architecture.
+        
+        ## Features
+        - Event creation and management
+        - Ticket sales and registration
+        - QR code check-in system
+        - Real-time analytics dashboard
+        - Multi-language support
+        
+        ## Services
+        This template deploys:
+        - PostgreSQL Database
+        - NestJS Backend API  
+        - Expo/React Native Web Frontend
+        
+        ## Post-Deployment
+        After deployment, your services will be automatically configured.
+        The frontend will connect to the backend API automatically.
+    services:
+        - name: postgres
+          icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/postgresql.svg
+          template: PREBUILT
+          spec:
+            source:
+                image: ghcr.io/zeabur/postgresql-ssl:16-alpine
+            ports:
+                - id: database
+                  port: 5432
+                  type: TCP
+            volumes:
+                - id: data
+                  dir: /var/lib/postgresql/data
+            env:
+                POSTGRES_DB:
+                    default: jctop
+                POSTGRES_USER:
+                    default: jctop
+                POSTGRES_PASSWORD:
+                    generate: PASSWORD
+                    
+        - name: backend
+          icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/nestjs.svg
+          template: GIT
+          spec:
+            source:
+                target: /
+            build:
+                dockerfile: server.Dockerfile
+            ports:
+                - id: web
+                  port: 3000
+                  type: HTTP
+            env:
+                NODE_ENV:
+                    default: production
+                DATABASE_URL:
+                    default: postgresql://${postgres.POSTGRES_USER}:${postgres.POSTGRES_PASSWORD}@${postgres.CONTAINER_HOSTNAME}:5432/${postgres.POSTGRES_DB}
+                JWT_SECRET:
+                    generate: PASSWORD
+                ENCRYPTION_SECRET_KEY:
+                    default: abcdefghijklmnopqrstuvwxyz123456
+                CORS_ORIGIN:
+                    default: https://${PUBLIC_DOMAIN}
+          domainKey: API_DOMAIN
+                    
+        - name: frontend
+          icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/react.svg
+          template: GIT
+          spec:
+            source:
+                target: /
+            build:
+                dockerfile: client.Dockerfile
+            ports:
+                - id: web
+                  port: 80
+                  type: HTTP
+            env:
+                EXPO_PUBLIC_API_URL:
+                    default: https://${API_DOMAIN}/api/v1
+          domainKey: PUBLIC_DOMAIN
