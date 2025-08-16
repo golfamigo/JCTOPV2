@@ -96,3 +96,49 @@ spec:
       description: Optional - Required only if you want to enable Google sign-in
       type: STRING
       optional: true
+
+localization:
+  zh-TW:
+    description: 全端活動管理系統，採用 React Native/Expo 前端和 NestJS 後端
+    readme: |
+      # JCTOP 活動管理系統
+      
+      完整的活動管理平台，包含：
+      - NestJS 後端 API
+      - Expo/React Native Web 前端
+      - PostgreSQL 資料庫
+      
+      ## 功能特色
+      - 活動建立與管理
+      - 票券銷售與報名
+      - QR Code 簽到
+      - 分析儀表板
+    configs:
+      - key: GOOGLE_CLIENT_ID
+        name: Google OAuth 客戶端 ID
+        description: 選填 - 只有當您想啟用 Google 登入時才需要
+      - key: GOOGLE_CLIENT_SECRET
+        name: Google OAuth 客戶端密鑰
+        description: 選填 - 只有當您想啟用 Google 登入時才需要
+  zh-CN:
+    description: 全栈活动管理系统，采用 React Native/Expo 前端和 NestJS 后端
+    readme: |
+      # JCTOP 活动管理系统
+      
+      完整的活动管理平台，包含：
+      - NestJS 后端 API
+      - Expo/React Native Web 前端
+      - PostgreSQL 数据库
+      
+      ## 功能特色
+      - 活动创建与管理
+      - 票券销售与报名
+      - 二维码签到
+      - 分析仪表板
+    configs:
+      - key: GOOGLE_CLIENT_ID
+        name: Google OAuth 客户端 ID
+        description: 选填 - 只有当您想启用 Google 登录时才需要
+      - key: GOOGLE_CLIENT_SECRET
+        name: Google OAuth 客户端密钥
+        description: 选填 - 只有当您想启用 Google 登录时才需要
