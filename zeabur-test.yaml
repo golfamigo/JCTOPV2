@@ -1,0 +1,15 @@
+apiVersion: zeabur.com/v1
+kind: Template
+metadata:
+  name: JCTOP-Test
+spec:
+  description: Test deployment
+  services:
+    - name: postgres
+      template: PREBUILT
+      spec:
+        source:
+          image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD:
+            default: testpassword

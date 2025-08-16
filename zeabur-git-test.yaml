@@ -1,0 +1,13 @@
+apiVersion: zeabur.com/v1
+kind: Template
+metadata:
+  name: JCTOP-Git-Test
+spec:
+  description: Test Git deployment
+  services:
+    - name: backend
+      template: GIT
+      spec:
+        env:
+          NODE_ENV:
+            default: production

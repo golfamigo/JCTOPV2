@@ -1,0 +1,25 @@
+apiVersion: zeabur.com/v1
+kind: Template
+metadata:
+  name: JCTOP-Simple
+spec:
+  description: Simple test with just PostgreSQL and one Git service
+  services:
+    - name: database
+      template: PREBUILT
+      spec:
+        source:
+          image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD:
+            generate: PASSWORD
+            
+    - name: backend
+      template: GIT
+      spec:
+        source:
+          git:
+            repoID: golfamigo/JCTOPV2
+        env:
+          NODE_ENV:
+            default: production
