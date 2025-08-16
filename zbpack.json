@@ -1,0 +1,4 @@
+{
+  "build_command": "",
+  "dockerfile": "./server.Dockerfile"
+}
