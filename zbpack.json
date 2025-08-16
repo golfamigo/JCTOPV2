@@ -1,0 +1,10 @@
+{
+  "services": {
+    "backend": {
+      "dockerfile": "server.Dockerfile"
+    },
+    "frontend": {
+      "dockerfile": "client.Dockerfile"
+    }
+  }
+}
