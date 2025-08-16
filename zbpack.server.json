@@ -1,6 +1,5 @@
 {
-  "app_dir": "apps/server",
   "dockerfile": {
-    "name": "Dockerfile.zeabur"
+    "name": "server"
   }
 }
