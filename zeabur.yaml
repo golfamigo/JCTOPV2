@@ -1,0 +1,50 @@
+# zeabur.yaml - 專案級協調檔案
+# 必須透過 CLI 命令 `zeabur template deploy` 部署
+services:
+  # PostgreSQL 資料庫服務
+  postgres-db:
+    name: postgres-db
+    template: PREBUILT
+    image: "postgres:16-alpine"
+    env:
+      POSTGRES_USER:
+        default: "jctop"
+        expose: true
+      POSTGRES_PASSWORD:
+        default: "jctop-secure-password"
+        expose: true
+      POSTGRES_DB:
+        default: "jctop"
+        expose: true
+
+  # 後端 API 服務
+  backend-api:
+    name: backend-api
+    template: GIT
+    github:
+      repoID: "golfamigo/JCTOPV2"
+    dependencies:
+      - postgres-db
+    env:
+      DATABASE_URL:
+        default: "postgresql://${postgres-db.POSTGRES_USER}:${postgres-db.POSTGRES_PASSWORD}@postgres-db:5432/${postgres-db.POSTGRES_DB}"
+      JWT_SECRET:
+        default: "jwt-secret-key"
+      ENCRYPTION_SECRET_KEY:
+        default: "abcdefghijklmnopqrstuvwxyz123456"
+      NODE_ENV:
+        default: "production"
+
+  # 前端 Web 服務
+  frontend-web:
+    name: frontend-web
+    template: GIT
+    github:
+      repoID: "golfamigo/JCTOPV2"
+    dependencies:
+      - backend-api
+    env:
+      EXPO_PUBLIC_API_URL:
+        default: "http://backend-api:3000/api/v1"
+      NODE_ENV:
+        default: "production"
