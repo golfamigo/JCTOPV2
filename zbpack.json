@@ -1,4 +1,3 @@
 {
-  "use_dockerfile": true,
   "dockerfile": "Dockerfile.backend"
 }
