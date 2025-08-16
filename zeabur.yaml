@@ -1,144 +1,181 @@
+# yaml-language-server: $schema=https://schema.zeabur.app/template.json
 apiVersion: zeabur.com/v1
 kind: Template
 metadata:
-  name: jctop-event-system
+    name: JCTOP Event Management System
 spec:
-  description: Full-stack event management system with React Native/Expo frontend and NestJS backend
-  icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/nestjs.svg
-  tags:
-    - nestjs
-    - expo
-    - postgresql
-    - monorepo
-  readme: |
-    # JCTOP Event Management System
-    
-    A complete event management platform with:
-    - NestJS backend API
-    - Expo/React Native Web frontend
-    - PostgreSQL database
-    
-    ## Features
-    - Event creation and management
-    - Ticket sales and registration
-    - QR code check-in
-    - Analytics dashboard
-    
-  services:
-    - name: database
-      icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/postgresql.svg
-      template: POSTGRESQL
-      spec:
-        env:
-          POSTGRES_DB:
-            default: jctop
-          POSTGRES_USER:
-            default: jctop
-          POSTGRES_PASSWORD:
-            generate: PASSWORD
-            
-    - name: server
-      icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/nestjs.svg
-      template: GIT
-      spec:
-        source:
-          target: server.Dockerfile
-        ports:
-          - id: main
-            port: 3000
-            type: HTTP
-        env:
-          NODE_ENV:
-            default: production
-          DATABASE_URL:
-            default: ${database.POSTGRES_CONNECTION_STRING}
-            expose: false
-          JWT_SECRET:
-            default: "1322fa7e9a2c139f54b2ef1f72c310e4"
-            expose: false
-          ENCRYPTION_SECRET_KEY:
-            default: "55f57ce844a791941af169291907e043"
-            expose: false
-          CORS_ORIGIN:
-            default: https://${client.DEPLOYED_DOMAIN}
-            expose: false
-          GOOGLE_CLIENT_ID:
-            default: ""
-            expose: true
-          GOOGLE_CLIENT_SECRET:
-            default: ""
-            expose: true
-            
-    - name: client
-      icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/react.svg
-      template: GIT
-      spec:
-        source:
-          target: client.Dockerfile
-        ports:
-          - id: web
-            port: 80
-            type: HTTP
-        env:
-          EXPO_PUBLIC_API_URL:
-            default: https://${server.DEPLOYED_DOMAIN}/api/v1
-            expose: false
-            
-  configs:
-    - key: GOOGLE_CLIENT_ID
-      name: Google OAuth Client ID
-      description: Optional - Required only if you want to enable Google sign-in
-      type: STRING
-      optional: true
-      
-    - key: GOOGLE_CLIENT_SECRET
-      name: Google OAuth Client Secret
-      description: Optional - Required only if you want to enable Google sign-in
-      type: STRING
-      optional: true
+    description: Full-stack event management system with React Native/Expo frontend and NestJS backend
+    icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/nestjs.svg
+    coverImage: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/nestjs.svg
+    variables:
+        - key: PUBLIC_DOMAIN
+          type: DOMAIN
+          name: Frontend Domain
+          description: The domain name for your JCTOP frontend application
+        - key: API_DOMAIN
+          type: DOMAIN
+          name: Backend API Domain
+          description: The domain name for your JCTOP backend API
+        - key: GOOGLE_CLIENT_ID
+          type: STRING
+          name: Google OAuth Client ID
+          description: Optional - Your Google OAuth Client ID for social login
+        - key: GOOGLE_CLIENT_SECRET
+          type: STRING
+          name: Google OAuth Client Secret
+          description: Optional - Your Google OAuth Client Secret for social login
+    tags:
+        - NestJS
+        - Expo
+        - PostgreSQL
+        - Monorepo
+        - Event Management
+    readme: |
+        # JCTOP Event Management System
+        
+        A comprehensive event management platform built with modern technologies.
+        
+        ## Features
+        - **Event Creation & Management**: Create and manage events with ease
+        - **Ticket Sales & Registration**: Handle ticket sales and attendee registration
+        - **QR Code Check-in**: Fast and efficient attendee check-in with QR codes
+        - **Analytics Dashboard**: Real-time event analytics and insights
+        - **Multi-language Support**: Built-in support for multiple languages
+        
+        ## Tech Stack
+        - **Backend**: NestJS with TypeScript
+        - **Frontend**: Expo/React Native Web
+        - **Database**: PostgreSQL with TypeORM
+        - **Authentication**: JWT with optional Google OAuth
+        
+        ## Post-Deployment Setup
+        
+        After deployment, your services will be automatically configured and connected.
+        
+        ### Optional: Configure Google OAuth
+        
+        If you want to enable Google sign-in:
+        
+        1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+        2. Create a new project or select existing one
+        3. Enable Google+ API
+        4. Create OAuth 2.0 credentials
+        5. Add authorized redirect URI: `https://<your-api-domain>/api/v1/auth/google/callback`
+        6. Update the GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables in Zeabur
+        
+        That's it! Your JCTOP Event Management System is ready to use.
+    services:
+        - name: database
+          icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/postgresql.svg
+          template: POSTGRESQL
+          spec:
+            env:
+                POSTGRES_DB:
+                    default: jctop
+                POSTGRES_USER:
+                    default: jctop
+                POSTGRES_PASSWORD:
+                    generate: PASSWORD
+                    
+        - name: server
+          icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/nestjs.svg
+          template: GIT
+          spec:
+            source:
+                target: server.Dockerfile
+            ports:
+                - id: main
+                  port: 3000
+                  type: HTTP
+            env:
+                NODE_ENV:
+                    default: production
+                DATABASE_URL:
+                    default: ${database.POSTGRES_CONNECTION_STRING}
+                    expose: false
+                JWT_SECRET:
+                    default: ${PASSWORD}
+                    expose: false
+                ENCRYPTION_SECRET_KEY:
+                    generate: PASSWORD
+                    expose: false
+                CORS_ORIGIN:
+                    default: https://${PUBLIC_DOMAIN}
+                    expose: false
+                GOOGLE_CLIENT_ID:
+                    default: ${GOOGLE_CLIENT_ID}
+                    expose: true
+                GOOGLE_CLIENT_SECRET:
+                    default: ${GOOGLE_CLIENT_SECRET}
+                    expose: false
+                GOOGLE_CALLBACK_URL:
+                    default: https://${ZEABUR_WEB_URL}/api/v1/auth/google/callback
+                    expose: false
+          domainKey: API_DOMAIN
+                    
+        - name: client
+          icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/react.svg
+          template: GIT
+          spec:
+            source:
+                target: client.Dockerfile
+            ports:
+                - id: web
+                  port: 80
+                  type: HTTP
+            env:
+                EXPO_PUBLIC_API_URL:
+                    default: https://${server.ZEABUR_WEB_URL}/api/v1
+                    expose: false
+          domainKey: PUBLIC_DOMAIN
 
 localization:
-  zh-TW:
-    description: 全端活動管理系統，採用 React Native/Expo 前端和 NestJS 後端
-    readme: |
-      # JCTOP 活動管理系統
-      
-      完整的活動管理平台，包含：
-      - NestJS 後端 API
-      - Expo/React Native Web 前端
-      - PostgreSQL 資料庫
-      
-      ## 功能特色
-      - 活動建立與管理
-      - 票券銷售與報名
-      - QR Code 簽到
-      - 分析儀表板
-    configs:
-      - key: GOOGLE_CLIENT_ID
-        name: Google OAuth 客戶端 ID
-        description: 選填 - 只有當您想啟用 Google 登入時才需要
-      - key: GOOGLE_CLIENT_SECRET
-        name: Google OAuth 客戶端密鑰
-        description: 選填 - 只有當您想啟用 Google 登入時才需要
-  zh-CN:
-    description: 全栈活动管理系统，采用 React Native/Expo 前端和 NestJS 后端
-    readme: |
-      # JCTOP 活动管理系统
-      
-      完整的活动管理平台，包含：
-      - NestJS 后端 API
-      - Expo/React Native Web 前端
-      - PostgreSQL 数据库
-      
-      ## 功能特色
-      - 活动创建与管理
-      - 票券销售与报名
-      - 二维码签到
-      - 分析仪表板
-    configs:
-      - key: GOOGLE_CLIENT_ID
-        name: Google OAuth 客户端 ID
-        description: 选填 - 只有当您想启用 Google 登录时才需要
-      - key: GOOGLE_CLIENT_SECRET
-        name: Google OAuth 客户端密钥
-        description: 选填 - 只有当您想启用 Google 登录时才需要
+    zh-TW:
+        description: 全端活動管理系統，採用 React Native/Expo 前端和 NestJS 後端
+        variables:
+            - key: PUBLIC_DOMAIN
+              name: 前端網域
+              description: 您的 JCTOP 前端應用程式的網域名稱
+            - key: API_DOMAIN
+              name: 後端 API 網域
+              description: 您的 JCTOP 後端 API 的網域名稱
+            - key: GOOGLE_CLIENT_ID
+              name: Google OAuth 客戶端 ID
+              description: 選填 - 用於社交登入的 Google OAuth 客戶端 ID
+            - key: GOOGLE_CLIENT_SECRET
+              name: Google OAuth 客戶端密鑰
+              description: 選填 - 用於社交登入的 Google OAuth 客戶端密鑰
+        readme: |
+            # JCTOP 活動管理系統
+            
+            使用現代技術構建的綜合活動管理平台。
+            
+            ## 功能特色
+            - **活動建立與管理**：輕鬆建立和管理活動
+            - **票券銷售與報名**：處理票券銷售和參與者報名
+            - **QR Code 簽到**：使用 QR Code 快速高效地簽到
+            - **分析儀表板**：即時活動分析和洞察
+            - **多語言支援**：內建多語言支援
+            
+            ## 技術架構
+            - **後端**：使用 TypeScript 的 NestJS
+            - **前端**：Expo/React Native Web
+            - **資料庫**：使用 TypeORM 的 PostgreSQL
+            - **認證**：JWT 與可選的 Google OAuth
+            
+            ## 部署後設定
+            
+            部署後，您的服務將自動配置並連接。
+            
+            ### 選用：配置 Google OAuth
+            
+            如果您想啟用 Google 登入：
+            
+            1. 前往 [Google Cloud Console](https://console.cloud.google.com/)
+            2. 建立新專案或選擇現有專案
+            3. 啟用 Google+ API
+            4. 建立 OAuth 2.0 憑證
+            5. 新增授權重新導向 URI：`https://<您的-api-網域>/api/v1/auth/google/callback`
+            6. 在 Zeabur 中更新 GOOGLE_CLIENT_ID 和 GOOGLE_CLIENT_SECRET 環境變數
+            
+            完成！您的 JCTOP 活動管理系統已準備就緒。
