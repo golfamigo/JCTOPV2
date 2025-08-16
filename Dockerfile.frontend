@@ -12,8 +12,8 @@ COPY package*.json ./
 COPY packages/shared-types/package*.json ./packages/shared-types/
 COPY apps/client/package*.json ./apps/client/
 
-# Install dependencies
-RUN npm install --only=production --legacy-peer-deps
+# Install dependencies with legacy peer deps to avoid conflicts
+RUN npm install --omit=dev --legacy-peer-deps
 
 # Build stage
 FROM base AS builder
@@ -24,8 +24,8 @@ COPY package*.json ./
 COPY packages/shared-types/package*.json ./packages/shared-types/
 COPY apps/client/package*.json ./apps/client/
 
-# Install all dependencies
-RUN npm install --legacy-peer-deps
+# Install all dependencies with force to bypass peer dependency conflicts
+RUN npm install --force
 
 # Copy source code
 COPY packages/shared-types ./packages/shared-types
