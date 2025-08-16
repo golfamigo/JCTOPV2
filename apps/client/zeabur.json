@@ -1,6 +1,0 @@
-{
-  "name": "jctop-frontend",
-  "build": {
-    "dockerfile": "./Dockerfile.zeabur"
-  }
-}

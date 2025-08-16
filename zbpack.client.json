@@ -1,0 +1,6 @@
+{
+  "app_dir": "apps/client",
+  "dockerfile": {
+    "name": "client.Dockerfile"
+  }
+}
