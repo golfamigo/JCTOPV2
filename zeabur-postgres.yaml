@@ -1,0 +1,31 @@
+apiVersion: zeabur.com/v1
+kind: Template
+metadata:
+  name: JCTOP-Database
+spec:
+  description: PostgreSQL Database for JCTOP System
+  services:
+    - name: jctop-postgres
+      template: PREBUILT
+      spec:
+        source:
+          image: postgres:16-alpine
+        ports:
+          - id: database
+            port: 5432
+            type: TCP
+        volumes:
+          - id: data
+            dir: /var/lib/postgresql/data
+        env:
+          POSTGRES_USER:
+            default: jctop
+            expose: true
+          POSTGRES_PASSWORD:
+            generate: PASSWORD
+            expose: true
+          POSTGRES_DB:
+            default: jctop
+            expose: true
+          PGDATA:
+            default: /var/lib/postgresql/data/pgdata

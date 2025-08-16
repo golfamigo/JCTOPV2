@@ -1,9 +1,9 @@
 apiVersion: zeabur.com/v1
 kind: Template
 metadata:
-  name: JCTOP-Full-Stack
+  name: JCTOP-Complete-Stack
 spec:
-  description: JCTOP Event Management System - Full Stack Monorepo Deployment
+  description: JCTOP Event Management System with Prebuilt Images
   icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/nestjs.svg
   tags:
     - NestJS
@@ -34,16 +34,19 @@ spec:
           POSTGRES_DB:
             default: jctop
             expose: true
+          PGDATA:
+            default: /var/lib/postgresql/data/pgdata
 
-    # Backend API Service
+    # Backend API Service (Prebuilt)
     - name: backend-api
-      template: GIT
+      template: PREBUILT
       spec:
         source:
-          type: GITHUB
-          repoID: 1031114699
-        build:
-          dockerfile: Dockerfile.backend
+          image: golfamigo/jctopv2-backend:latest
+        ports:
+          - id: web
+            port: 3000
+            type: HTTP
         env:
           DATABASE_URL:
             default: postgresql://${postgres-db.POSTGRES_USER}:${postgres-db.POSTGRES_PASSWORD}@postgres-db:5432/${postgres-db.POSTGRES_DB}
@@ -53,26 +56,21 @@ spec:
             default: abcdefghijklmnopqrstuvwxyz123456
           NODE_ENV:
             default: production
-        ports:
-          - id: web
-            port: 3000
-            type: HTTP
+          CORS_ORIGIN:
+            default: https://${frontend-web.ZEABUR_WEB_URL}
 
-    # Frontend Web Service
+    # Frontend Web Service (Prebuilt)
     - name: frontend-web
-      template: GIT
+      template: PREBUILT
       spec:
         source:
-          type: GITHUB
-          repoID: 1031114699
-        build:
-          dockerfile: Dockerfile.frontend
+          image: golfamigo/jctopv2-frontend:latest
+        ports:
+          - id: web
+            port: 80
+            type: HTTP
         env:
           EXPO_PUBLIC_API_URL:
             default: https://${backend-api.ZEABUR_WEB_URL}/api/v1
           NODE_ENV:
             default: production
-        ports:
-          - id: web
-            port: 80
-            type: HTTP

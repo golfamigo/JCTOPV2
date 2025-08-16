@@ -1,0 +1,46 @@
+apiVersion: zeabur.com/v1
+kind: Template
+metadata:
+  name: JCTOP-System
+spec:
+  description: JCTOP Event Management System
+  services:
+    - name: postgres-db
+      template: PREBUILT
+      spec:
+        source:
+          image: postgres:16-alpine
+        env:
+          POSTGRES_USER:
+            default: jctop
+            expose: true
+          POSTGRES_PASSWORD:
+            generate: PASSWORD
+            expose: true
+          POSTGRES_DB:
+            default: jctop
+            expose: true
+            
+    - name: backend-api
+      template: GIT
+      spec:
+        type: GITHUB
+        repoID: 1031114699
+        branch: master
+        env:
+          DATABASE_URL:
+            default: postgresql://${postgres-db.POSTGRES_USER}:${postgres-db.POSTGRES_PASSWORD}@postgres-db:5432/${postgres-db.POSTGRES_DB}
+          NODE_ENV:
+            default: production
+            
+    - name: frontend-web
+      template: GIT  
+      spec:
+        type: GITHUB
+        repoID: 1031114699
+        branch: master
+        env:
+          EXPO_PUBLIC_API_URL:
+            default: http://backend-api:3000/api/v1
+          NODE_ENV:
+            default: production
