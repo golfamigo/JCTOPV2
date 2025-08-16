@@ -1,11 +1,10 @@
 {
   "name": "jctop-frontend",
-  "build_command": "npm install",
-  "start_command": "npm run web",
+  "installCommand": "npm install",
+  "buildCommand": "echo 'No build needed for Expo dev server'",
+  "startCommand": "npx expo start --web --port 3000 --host 0.0.0.0",
   "environment": {
     "NODE_VERSION": "18",
-    "EXPO_PUBLIC_API_URL": "${BACKEND_URL}/api/v1",
-    "PORT": "3000"
-  },
-  "port": 3000
+    "EXPO_PUBLIC_API_URL": "${BACKEND_URL}/api/v1"
+  }
 }
