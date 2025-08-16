@@ -1,6 +1,6 @@
 {
   "name": "jctop-frontend",
-  "installCommand": "npm install",
+  "installCommand": "npm install --legacy-peer-deps || true",
   "buildCommand": "echo 'No build needed for Expo dev server'",
   "startCommand": "npx expo start --web --port 3000 --host 0.0.0.0",
   "environment": {

@@ -1,0 +1,28 @@
+# Zeabur optimized Dockerfile for frontend
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy all necessary files from monorepo root
+COPY package*.json ./
+COPY apps/client/package*.json ./apps/client/
+COPY packages/shared-types/package*.json ./packages/shared-types/
+
+# Install dependencies
+RUN npm install --legacy-peer-deps
+
+# Copy source code
+COPY packages/shared-types ./packages/shared-types
+COPY apps/client ./apps/client
+
+# Build shared types
+WORKDIR /app/packages/shared-types
+RUN npm run build || echo "No build script"
+
+# Go to client directory
+WORKDIR /app/apps/client
+
+EXPOSE 3000
+
+# Start Expo dev server
+CMD ["npx", "expo", "start", "--web", "--port", "3000", "--host", "0.0.0.0"]
