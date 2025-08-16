@@ -1,4 +1,6 @@
 {
-  "build_command": "",
-  "dockerfile": "./server.Dockerfile"
+  "build_command": "echo 'Using Dockerfile'",
+  "dockerfile": "server.Dockerfile",
+  "install_command": "",
+  "start_command": ""
 }
