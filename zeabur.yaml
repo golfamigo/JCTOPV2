@@ -1,41 +1,98 @@
-# Zeabur Template YAML for JCTOP Event Management System
-# This file defines the complete infrastructure for the application
-# including frontend, backend, and database services
-
-services:
-  # PostgreSQL Database Service
-  database:
-    name: database
-    image: zeabur/postgresql:16-alpine
-    env:
-      POSTGRES_DB: jctop
-      POSTGRES_USER: jctop
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-      
-  # Backend API Service (NestJS)
-  server:
-    name: server
-    source:
-      type: github
-    env:
-      NODE_ENV: production
-      # Database connection - automatically injected from database service
-      DATABASE_URL: ${database.POSTGRES_CONNECTION_STRING}
-      # Security keys
-      JWT_SECRET: "1322fa7e9a2c139f54b2ef1f72c310e4"
-      ENCRYPTION_SECRET_KEY: "55f57ce844a791941af169291907e043"
-      # CORS configuration - reference client service URL
-      CORS_ORIGIN: https://${client.ZEABUR_WEB_DOMAIN}
-      # Google OAuth configuration (optional)
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      GOOGLE_CALLBACK_URL: https://${self.ZEABUR_WEB_DOMAIN}/api/v1/auth/google/callback
+apiVersion: zeabur.com/v1
+kind: Template
+metadata:
+  name: jctop-event-system
+spec:
+  description: Full-stack event management system with React Native/Expo frontend and NestJS backend
+  icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/nestjs.svg
+  tags:
+    - nestjs
+    - expo
+    - postgresql
+    - monorepo
+  readme: |
+    # JCTOP Event Management System
     
-  # Frontend Web Service (Expo/React Native Web)
-  client:
-    name: client
-    source:
-      type: github
-    env:
-      # API endpoint - reference server service URL
-      EXPO_PUBLIC_API_URL: https://${server.ZEABUR_WEB_DOMAIN}/api/v1
+    A complete event management platform with:
+    - NestJS backend API
+    - Expo/React Native Web frontend
+    - PostgreSQL database
+    
+    ## Features
+    - Event creation and management
+    - Ticket sales and registration
+    - QR code check-in
+    - Analytics dashboard
+    
+  services:
+    - name: database
+      icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/postgresql.svg
+      template: POSTGRESQL
+      spec:
+        env:
+          POSTGRES_DB:
+            default: jctop
+          POSTGRES_USER:
+            default: jctop
+          POSTGRES_PASSWORD:
+            generate: PASSWORD
+            
+    - name: server
+      icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/nestjs.svg
+      template: GIT
+      spec:
+        source:
+          target: server.Dockerfile
+        ports:
+          - id: main
+            port: 3000
+            type: HTTP
+        env:
+          NODE_ENV:
+            default: production
+          DATABASE_URL:
+            default: ${database.POSTGRES_CONNECTION_STRING}
+            expose: false
+          JWT_SECRET:
+            default: "1322fa7e9a2c139f54b2ef1f72c310e4"
+            expose: false
+          ENCRYPTION_SECRET_KEY:
+            default: "55f57ce844a791941af169291907e043"
+            expose: false
+          CORS_ORIGIN:
+            default: https://${client.DEPLOYED_DOMAIN}
+            expose: false
+          GOOGLE_CLIENT_ID:
+            default: ""
+            expose: true
+          GOOGLE_CLIENT_SECRET:
+            default: ""
+            expose: true
+            
+    - name: client
+      icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/react.svg
+      template: GIT
+      spec:
+        source:
+          target: client.Dockerfile
+        ports:
+          - id: web
+            port: 80
+            type: HTTP
+        env:
+          EXPO_PUBLIC_API_URL:
+            default: https://${server.DEPLOYED_DOMAIN}/api/v1
+            expose: false
+            
+  configs:
+    - key: GOOGLE_CLIENT_ID
+      name: Google OAuth Client ID
+      description: Optional - Required only if you want to enable Google sign-in
+      type: STRING
+      optional: true
+      
+    - key: GOOGLE_CLIENT_SECRET
+      name: Google OAuth Client Secret
+      description: Optional - Required only if you want to enable Google sign-in
+      type: STRING
+      optional: true
