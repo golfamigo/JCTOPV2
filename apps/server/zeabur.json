@@ -1,10 +1,6 @@
 {
   "name": "jctop-backend",
-  "installCommand": "npm install",
-  "buildCommand": "npm run build",
-  "startCommand": "npm run start:prod",
-  "environment": {
-    "NODE_VERSION": "18",
-    "NODE_ENV": "production"
+  "build": {
+    "dockerfile": "./Dockerfile.zeabur"
   }
 }
