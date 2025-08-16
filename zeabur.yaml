@@ -21,7 +21,7 @@ spec:
         - React
         - PostgreSQL
         - Tool
-    readme: |
+    readme: |-
         # JCTOP Event Management System
         
         A complete event management platform with modern architecture.
@@ -43,12 +43,12 @@ spec:
         After deployment, your services will be automatically configured.
         The frontend will connect to the backend API automatically.
     services:
-        - name: postgres
+        - name: postgresql
           icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/postgresql.svg
           template: PREBUILT
           spec:
             source:
-                image: ghcr.io/zeabur/postgresql-ssl:16-alpine
+                image: postgres:16-alpine
             ports:
                 - id: database
                   port: 5432
@@ -57,15 +57,41 @@ spec:
                 - id: data
                   dir: /var/lib/postgresql/data
             env:
+                PGDATA:
+                    default: /var/lib/postgresql/data/pgdata
+                POSTGRES_CONNECTION_STRING:
+                    default: postgresql://${POSTGRES_USERNAME}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DATABASE}
+                    expose: true
+                POSTGRES_DATABASE:
+                    default: ${POSTGRES_DB}
+                    expose: true
                 POSTGRES_DB:
                     default: jctop
-                POSTGRES_USER:
-                    default: jctop
+                POSTGRES_HOST:
+                    default: ${CONTAINER_HOSTNAME}
+                    expose: true
                 POSTGRES_PASSWORD:
-                    generate: PASSWORD
+                    default: ${PASSWORD}
+                    expose: true
+                POSTGRES_PORT:
+                    default: ${DATABASE_PORT}
+                    expose: true
+                POSTGRES_URI:
+                    default: ${POSTGRES_CONNECTION_STRING}
+                    expose: true
+                POSTGRES_USER:
+                    default: root
+                POSTGRES_USERNAME:
+                    default: ${POSTGRES_USER}
+                    expose: true
+            healthCheck:
+                type: TCP
+                port: database
                     
         - name: backend
           icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/nestjs.svg
+          dependencies:
+            - postgresql
           template: GIT
           spec:
             source:
@@ -80,17 +106,28 @@ spec:
                 NODE_ENV:
                     default: production
                 DATABASE_URL:
-                    default: postgresql://${postgres.POSTGRES_USER}:${postgres.POSTGRES_PASSWORD}@${postgres.CONTAINER_HOSTNAME}:5432/${postgres.POSTGRES_DB}
+                    default: ${POSTGRES_CONNECTION_STRING}
                 JWT_SECRET:
-                    generate: PASSWORD
+                    default: ${PASSWORD}
                 ENCRYPTION_SECRET_KEY:
                     default: abcdefghijklmnopqrstuvwxyz123456
                 CORS_ORIGIN:
                     default: https://${PUBLIC_DOMAIN}
+                GOOGLE_CLIENT_ID:
+                    default: ""
+                GOOGLE_CLIENT_SECRET:
+                    default: ""
+            healthCheck:
+                type: HTTP
+                port: web
+                http:
+                    path: /api/v1/health
           domainKey: API_DOMAIN
                     
         - name: frontend
           icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/react.svg
+          dependencies:
+            - backend
           template: GIT
           spec:
             source:
@@ -103,5 +140,41 @@ spec:
                   type: HTTP
             env:
                 EXPO_PUBLIC_API_URL:
-                    default: https://${API_DOMAIN}/api/v1
+                    default: https://${ZEABUR_WEB_DOMAIN}/api/v1
+            healthCheck:
+                type: HTTP
+                port: web
+                http:
+                    path: /
           domainKey: PUBLIC_DOMAIN
+localization:
+    zh-TW:
+        description: 採用 NestJS 後端和 Expo 網頁前端的活動管理系統
+        variables:
+            - key: PUBLIC_DOMAIN
+              name: 前端網域
+              description: 您的 JCTOP 前端應用程式網域
+            - key: API_DOMAIN
+              name: API 網域  
+              description: 您的 JCTOP 後端 API 網域
+        readme: |-
+            # JCTOP 活動管理系統
+            
+            採用現代架構的完整活動管理平台。
+            
+            ## 功能特色
+            - 活動建立與管理
+            - 票券銷售與報名
+            - QR Code 簽到系統
+            - 即時分析儀表板
+            - 多語言支援
+            
+            ## 服務
+            此模板部署：
+            - PostgreSQL 資料庫
+            - NestJS 後端 API  
+            - Expo/React Native 網頁前端
+            
+            ## 部署後設定
+            部署後，您的服務將自動配置並連接。
+            前端將自動連接到後端 API。
