@@ -1,0 +1,2 @@
+root: apps/client
+dockerfile: ../../client.Dockerfile
