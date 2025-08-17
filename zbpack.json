@@ -1,4 +1,5 @@
 {
-  "use_dockerfile": true,
-  "dockerfile": "Dockerfile.frontend"
+  "dockerfile": {
+    "name": "Dockerfile.frontend"
+  }
 }
