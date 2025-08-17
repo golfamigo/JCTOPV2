@@ -8,8 +8,8 @@ COPY package*.json ./
 COPY packages/shared-types/package*.json ./packages/shared-types/
 COPY apps/client/package*.json ./apps/client/
 
-# Install dependencies with legacy peer deps
-RUN npm install --legacy-peer-deps
+# Install dependencies with legacy peer deps and reduced verbosity
+RUN npm install --legacy-peer-deps --loglevel=error
 
 # Copy all source code
 COPY . .
@@ -21,7 +21,8 @@ RUN npm run build
 # Build the Expo web app
 WORKDIR /app/apps/client
 ENV EXPO_PUBLIC_API_URL=https://jctop.zeabur.app/api/v1
-RUN npx expo export --platform web --output-dir dist
+ENV EXPO_ROUTER_APP_ROOT=./src/app
+RUN npm run build:static
 
 # ---- Stage 2: Production Server ----
 FROM nginx:1.25-alpine
