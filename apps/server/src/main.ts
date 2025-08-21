@@ -12,33 +12,9 @@ import { DataSource } from 'typeorm';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
-  // Enable CORS
-  const corsOrigins = process.env.CORS_ORIGIN?.split(',') || [
-    'http://localhost:3000',
-    'http://localhost:8081',
-    'https://jctop-client.zeabur.app',
-    'https://*.zeabur.app'
-  ];
-  
+  // Enable CORS - Simple configuration for development
   app.enableCors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or Postman)
-      if (!origin) return callback(null, true);
-      
-      // Check if origin is in allowed list or matches pattern
-      if (corsOrigins.includes(origin) || 
-          corsOrigins.some(allowed => {
-            if (allowed.includes('*')) {
-              const pattern = allowed.replace('*', '.*');
-              return new RegExp(pattern).test(origin);
-            }
-            return allowed === origin;
-          })) {
-        callback(null, true);
-      } else {
-        callback(null, false);
-      }
-    },
+    origin: true, // Allow all origins in development
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
