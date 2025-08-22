@@ -73,7 +73,7 @@
               "default": "production"
             },
             "CORS_ORIGIN": {
-              "default": "https://${frontend-web.ZEABUR_WEB_URL}"
+              "default": "https://jctop-web.zeabur.app"
             },
             "GOOGLE_CLIENT_ID": {
               "default": ""
