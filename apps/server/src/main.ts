@@ -6,18 +6,28 @@ if (typeof global.crypto === 'undefined') {
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { DataSource } from 'typeorm';
+import { setupSwagger } from './swagger.config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
-  // Enable CORS - Simple configuration for development
+  // Enable CORS with FlutterFlow support
   app.enableCors({
-    origin: true, // Allow all origins in development
+    origin: [
+      'http://localhost:3000',
+      'http://localhost:3001', 
+      'https://jctop.zeabur.app',
+      'https://app.flutterflow.io',
+      'https://blooming-anchorage-74937-01abcbf2453c.herokuapp.com',
+      /\.flutterflow\.io$/,
+      /\.herokuapp\.com$/,
+      true // Allow all origins in development
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['Content-Length', 'Content-Type'],
   });
   
   // Validate database connection on startup
@@ -41,13 +51,8 @@ async function bootstrap() {
   // Set global API prefix
   app.setGlobalPrefix('api/v1');
   
-  const config = new DocumentBuilder()
-    .setTitle('JCTOP Event Management API')
-    .setDescription('The JCTOP Event Management API description')
-    .setVersion('1.0')
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  // Setup Swagger documentation
+  setupSwagger(app);
   
   const port = process.env.PORT || 3000;
   await app.listen(port);

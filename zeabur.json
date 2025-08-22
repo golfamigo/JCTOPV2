@@ -1,0 +1,127 @@
+{
+  "apiVersion": "zeabur.com/v1",
+  "kind": "Template",
+  "metadata": {
+    "name": "JCTOP-Full-Stack"
+  },
+  "spec": {
+    "description": "JCTOP Event Management System - Full Stack Monorepo Deployment",
+    "icon": "https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/nestjs.svg",
+    "tags": [
+      "NestJS",
+      "Expo",
+      "PostgreSQL",
+      "Monorepo"
+    ],
+    "services": [
+      {
+        "name": "postgres-db",
+        "template": "PREBUILT",
+        "spec": {
+          "source": {
+            "image": "postgres:17"
+          },
+          "ports": [
+            {
+              "id": "database",
+              "port": 5432,
+              "type": "TCP"
+            }
+          ],
+          "volumes": [
+            {
+              "id": "data",
+              "dir": "/var/lib/postgresql/data"
+            }
+          ],
+          "env": {
+            "POSTGRES_USER": {
+              "default": "jctop",
+              "expose": true
+            },
+            "POSTGRES_PASSWORD": {
+              "generate": "PASSWORD",
+              "expose": true
+            },
+            "POSTGRES_DB": {
+              "default": "jctop",
+              "expose": true
+            }
+          }
+        }
+      },
+      {
+        "name": "backend-api",
+        "template": "GIT",
+        "spec": {
+          "source": {
+            "git": {
+              "repoID": "golfamigo/JCTOPV2",
+              "branch": "master"
+            }
+          },
+          "env": {
+            "DATABASE_URL": {
+              "default": "postgresql://${postgres-db.POSTGRES_USER}:${postgres-db.POSTGRES_PASSWORD}@postgres-db:5432/${postgres-db.POSTGRES_DB}"
+            },
+            "JWT_SECRET": {
+              "default": "1322fa7e9a2c139f54b2ef1f72c310e4"
+            },
+            "ENCRYPTION_SECRET_KEY": {
+              "default": "55f57ce844a791941af169291907e043"
+            },
+            "NODE_ENV": {
+              "default": "production"
+            },
+            "CORS_ORIGIN": {
+              "default": "https://${frontend-web.ZEABUR_WEB_URL}"
+            },
+            "GOOGLE_CLIENT_ID": {
+              "default": ""
+            },
+            "GOOGLE_CLIENT_SECRET": {
+              "default": ""
+            },
+            "GOOGLE_CALLBACK_URL": {
+              "default": "https://${backend-api.ZEABUR_WEB_URL}/api/v1/auth/google/callback"
+            }
+          },
+          "ports": [
+            {
+              "id": "web",
+              "port": 3000,
+              "type": "HTTP"
+            }
+          ]
+        }
+      },
+      {
+        "name": "frontend-web",
+        "template": "GIT",
+        "spec": {
+          "source": {
+            "git": {
+              "repoID": "golfamigo/JCTOPV2",
+              "branch": "master"
+            }
+          },
+          "env": {
+            "EXPO_PUBLIC_API_URL": {
+              "default": "https://${backend-api.ZEABUR_WEB_URL}/api/v1"
+            },
+            "NODE_ENV": {
+              "default": "production"
+            }
+          },
+          "ports": [
+            {
+              "id": "web",
+              "port": 80,
+              "type": "HTTP"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

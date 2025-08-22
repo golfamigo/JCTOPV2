@@ -12,11 +12,11 @@ spec:
     - Monorepo
   services:
     # PostgreSQL Database
-    - name: postgres-db
+    - name: postgres
       template: PREBUILT
       spec:
         source:
-          image: postgres:16-alpine
+          image: postgres:17
         ports:
           - id: database
             port: 5432
@@ -25,54 +25,49 @@ spec:
           - id: data
             dir: /var/lib/postgresql/data
         env:
-          POSTGRES_USER:
-            default: jctop
-            expose: true
+          POSTGRES_DATABASE:
+            default: zeabur
           POSTGRES_PASSWORD:
             generate: PASSWORD
-            expose: true
-          POSTGRES_DB:
-            default: jctop
-            expose: true
+          POSTGRES_USER:
+            default: root
 
     # Backend API Service
     - name: backend-api
       template: GIT
       spec:
         source:
-          type: GITHUB
-          repoID: 1031114699
-        build:
-          dockerfile: Dockerfile.backend
-        env:
-          DATABASE_URL:
-            default: postgresql://${postgres-db.POSTGRES_USER}:${postgres-db.POSTGRES_PASSWORD}@postgres-db:5432/${postgres-db.POSTGRES_DB}
-          JWT_SECRET:
-            generate: PASSWORD
-          ENCRYPTION_SECRET_KEY:
-            default: abcdefghijklmnopqrstuvwxyz123456
-          NODE_ENV:
-            default: production
+          git:
+            type: GITHUB
+            repoID: golfamigo/JCTOPV2
         ports:
           - id: web
             port: 3000
             type: HTTP
+        env:
+          DATABASE_URL:
+            default: postgresql://${postgres.POSTGRES_USER}:${postgres.POSTGRES_PASSWORD}@postgres:5432/${postgres.POSTGRES_DATABASE}
+          JWT_SECRET:
+            default: 1322fa7e9a2c139f54b2ef1f72c310e4
+          ENCRYPTION_SECRET_KEY:
+            default: 55f57ce844a791941af169291907e043
+          NODE_ENV:
+            default: production
 
     # Frontend Web Service
     - name: frontend-web
       template: GIT
       spec:
         source:
-          type: GITHUB
-          repoID: 1031114699
-        build:
-          dockerfile: Dockerfile.frontend
-        env:
-          EXPO_PUBLIC_API_URL:
-            default: https://${backend-api.ZEABUR_WEB_URL}/api/v1
-          NODE_ENV:
-            default: production
+          git:
+            type: GITHUB
+            repoID: golfamigo/JCTOPV2
         ports:
           - id: web
             port: 80
             type: HTTP
+        env:
+          EXPO_PUBLIC_API_URL:
+            default: https://${backend-api.ZEABUR_URL}/api/v1
+          NODE_ENV:
+            default: production
