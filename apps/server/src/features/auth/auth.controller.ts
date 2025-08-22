@@ -146,15 +146,39 @@ export class AuthController {
     try {
       const accessToken = await this.authService.generateJwt(req.user);
       
-      // For mobile apps, redirect to a deep link with the access token
-      // The mobile app will handle this deep link and extract the token
-      const deepLinkUrl = `com.jctopevent.client://auth/callback?token=${accessToken}&success=true`;
+      // Check if this is a web or mobile request based on user agent or query param
+      const userAgent = req.headers['user-agent'] || '';
+      const isWeb = req.query.platform === 'web' || 
+                    userAgent.includes('Mozilla') || 
+                    userAgent.includes('Chrome') || 
+                    userAgent.includes('Safari');
       
-      res.redirect(deepLinkUrl);
+      if (isWeb) {
+        // For web apps, redirect to the web callback URL
+        const webCallbackUrl = process.env.WEB_APP_URL || 'https://jctop-web.zeabur.app';
+        const callbackUrl = `${webCallbackUrl}/auth/callback?token=${accessToken}&success=true`;
+        res.redirect(callbackUrl);
+      } else {
+        // For mobile apps, redirect to a deep link with the access token
+        const deepLinkUrl = `com.jctopevent.client://auth/callback?token=${accessToken}&success=true`;
+        res.redirect(deepLinkUrl);
+      }
     } catch {
-      // Redirect to error deep link
-      const errorDeepLink = `com.jctopevent.client://auth/callback?error=authentication_failed&success=false`;
-      res.redirect(errorDeepLink);
+      // Check platform for error redirect
+      const userAgent = req.headers['user-agent'] || '';
+      const isWeb = req.query.platform === 'web' || 
+                    userAgent.includes('Mozilla') || 
+                    userAgent.includes('Chrome') || 
+                    userAgent.includes('Safari');
+      
+      if (isWeb) {
+        const webCallbackUrl = process.env.WEB_APP_URL || 'https://jctop-web.zeabur.app';
+        const errorUrl = `${webCallbackUrl}/auth/callback?error=authentication_failed&success=false`;
+        res.redirect(errorUrl);
+      } else {
+        const errorDeepLink = `com.jctopevent.client://auth/callback?error=authentication_failed&success=false`;
+        res.redirect(errorDeepLink);
+      }
     }
   }
 
