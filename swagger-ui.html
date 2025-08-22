@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JCTOP API Documentation</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+    .swagger-ui .topbar {
+      display: none;
+    }
+    #swagger-ui {
+      padding: 20px;
+    }
+    .header {
+      background: linear-gradient(135deg, #2563EB 0%, #1e40af 100%);
+      color: white;
+      padding: 30px 20px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 2.5em;
+      font-weight: 600;
+    }
+    .header p {
+      margin: 10px 0 0 0;
+      opacity: 0.9;
+      font-size: 1.1em;
+    }
+    .server-selector {
+      background: #f8f9fa;
+      padding: 20px;
+      border-bottom: 1px solid #dee2e6;
+      text-align: center;
+    }
+    .server-selector select {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      background: white;
+      cursor: pointer;
+      min-width: 300px;
+    }
+    .server-selector label {
+      margin-right: 10px;
+      font-weight: 600;
+      color: #495057;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>JCTOP Event Management API</h1>
+    <p>完整的活動管理系統 API 文檔</p>
+  </div>
+  
+  <div class="server-selector">
+    <label for="server-select">選擇伺服器：</label>
+    <select id="server-select" onchange="changeServer(this.value)">
+      <option value="http://localhost:3001/api/v1">本地開發 - http://localhost:3001</option>
+      <option value="https://jctop.zeabur.app/api/v1">生產環境 - https://jctop.zeabur.app</option>
+    </select>
+  </div>
+
+  <div id="swagger-ui"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js"></script>
+  <script>
+    let currentServer = 'http://localhost:3001/api/v1';
+    
+    function initSwagger() {
+      window.ui = SwaggerUIBundle({
+        url: './swagger.yaml',
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        persistAuthorization: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        plugins: [
+          SwaggerUIBundle.plugins.DownloadUrl
+        ],
+        layout: "StandaloneLayout",
+        validatorUrl: null,
+        tryItOutEnabled: true,
+        supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch'],
+        onComplete: function() {
+          // Set default server
+          ui.preauthorizeApiKey('bearerAuth', '');
+        }
+      });
+    }
+    
+    function changeServer(server) {
+      currentServer = server;
+      // Update the swagger spec with new server
+      if (window.ui) {
+        const spec = window.ui.spec().toJS();
+        spec.servers = [{
+          url: server,
+          description: server.includes('localhost') ? 'Local development' : 'Production'
+        }];
+        window.ui.specActions.updateSpec(JSON.stringify(spec));
+      }
+    }
+    
+    // Initialize on page load
+    window.onload = function() {
+      initSwagger();
+    }
+  </script>
+</body>
+</html>
