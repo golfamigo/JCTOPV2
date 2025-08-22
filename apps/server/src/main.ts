@@ -12,21 +12,9 @@ import { setupSwagger } from './swagger.config';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
-  // Enable CORS with FlutterFlow support
-  const corsOrigins = process.env.NODE_ENV === 'production' 
-    ? [
-        'http://localhost:3000',
-        'http://localhost:3001', 
-        'https://jctop.zeabur.app',
-        'https://app.flutterflow.io',
-        'https://blooming-anchorage-74937-01abcbf2453c.herokuapp.com',
-        /\.flutterflow\.io$/,
-        /\.herokuapp\.com$/,
-      ]
-    : true; // Allow all origins in development
-    
+  // Enable CORS - Allow all origins for now
   app.enableCors({
-    origin: corsOrigins,
+    origin: true, // Allow all origins
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
